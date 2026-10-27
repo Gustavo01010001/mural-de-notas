@@ -1,0 +1,17 @@
+{
+  "name": "projeto2-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Front do Mural de Notas (Next.js) - só a parte visual",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "framer-motion": "^14.7.1",
+    "next": "^16.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}

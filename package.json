@@ -1,0 +1,10 @@
+{
+  "name": "projeto2.0",
+  "private": true,
+  "description": "Mural de Notas: Next.js (front) + Express (back) + SQLite (banco)",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev:back": "npm run dev --prefix backend",
+    "dev:front": "npm run dev --prefix frontend"
+  }
+}

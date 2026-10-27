@@ -1,0 +1,26 @@
+# Dependências e builds
+node_modules/
+.next/
+out/
+build/
+
+# Banco de dados local (contas, senhas com hash, post-its) — NUNCA enviar
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Variáveis de ambiente (chaves de API) — só os .example vão para o GitHub
+.env
+.env.*
+!.env.example
+
+# Configurações locais do editor/ferramentas
+.claude/
+.vscode/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

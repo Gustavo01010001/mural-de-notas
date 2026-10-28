@@ -1,6 +1,7 @@
 # ✅ Relatório de testes — Mural de Notas
 
-Data: 27/10/2026 · Ambiente: Windows 11, Node 24, Next.js 16, HTTPS local (`npm run dev:https`)
+Data: 27/10/2026 · Ambiente: Windows 11, Node 24, Next.js 16, HTTPS local (`npm run dev` no frontend,
+acessado em `https://localhost:3000`)
 
 ## 1. Testes automáticos da API (`npm test` na pasta `backend`)
 

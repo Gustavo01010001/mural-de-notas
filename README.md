@@ -13,69 +13,83 @@ com **clima e hora** animados no canto e **alertas de datas importantes**
 ## Como funciona o fluxo
 
 ```
-Usuário digita  ──►  Front (Next.js)  ──fetch──►  Back (Express)  ──►  SQLite
-                     só visual               valida + regra         salva
-                ◄──  mostra resposta  ◄──JSON──  responde
+Navegador (PC/celular) ══HTTPS══►  Front (Next.js)  ──/api──►  Back (Express)  ──►  SQLite
+                                   só visual                  valida + regra        salva
+                       ◄══HTTPS══  mostra resposta  ◄──JSON──  responde
 ```
 
-- O **front** só cuida da parte visual: envia o que o usuário digitou e mostra o que o back responder.
-- O **back** valida tudo, cria hash da senha, salva no banco e calcula datas/alertas.
+- O navegador fala **só com o front, sempre em HTTPS** (conexão criptografada, cadeado 🔒).
+- O **front** cuida da parte visual e repassa as chamadas `/api` para o back.
+- O **back** valida tudo, cria hash da senha, salva no banco e calcula datas/alertas. Ele roda
+  **só dentro do seu PC** (`127.0.0.1:4000`), sem acesso pela rede — por isso não precisa de certificado.
 
 ## Requisitos
 
 - **Node.js 22.13 ou maior** (o SQLite já vem embutido no Node, não precisa instalar nada).
+- **Git para Windows** (já traz o `openssl`, usado para gerar o certificado HTTPS).
 
 ## Rodando no VS Code
 
 Abra a pasta `projeto2.0` no VS Code e use **dois terminais**:
 
-**Terminal 1 — backend (porta 4000):**
+**Terminal 1 — backend:**
 ```bash
 cd backend
 npm install
 npm run dev
 ```
 
-**Terminal 2 — frontend (porta 3000):**
+**Terminal 2 — frontend (HTTPS, porta 3000):**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Acesse **http://localhost:3000**, crie sua conta em *Cadastre-se* e comece a colar post-its.
+Na primeira vez o front gera os certificados sozinho e mostra os endereços. Acesse
+**https://localhost:3000**, crie sua conta em *Cadastre-se* e comece a colar post-its.
+
+### 🔒 Confiar no certificado (uma vez por aparelho)
+
+O certificado é criado por uma "autoridade" que existe só no seu PC, então na primeira vez o
+navegador mostra **"Sua conexão não é particular"**. Para o cadeado aparecer normal:
+
+- **PC (Windows):** rode no terminal e clique em **Sim** na janela que abrir; depois feche e abra o navegador.
+  ```bash
+  certutil -user -addstore Root "frontend\certs\ca.pem"
+  ```
+  Para desfazer: `certutil -user -delstore Root "Mural de Notas - CA local"`.
+- **Celular:** veja a seção abaixo.
 
 ## 🧪 Testes
 
 - `npm test` na pasta `backend`: 25 testes automáticos da API (usam um banco temporário).
 - Relatório completo dos testes de PC e celular: [TESTES.md](TESTES.md).
 
-## 📱 Testar no celular com HTTPS (mesma rede Wi-Fi)
+## 📱 Usar no celular (mesma rede Wi-Fi)
 
-O navegador só libera **localização** (clima da sua cidade) e **notificações** em HTTPS.
+1. Com backend e frontend rodando, veja no terminal do front a linha
+   `📱 No celular (mesma rede): https://SEU_IP:3000` (ou descubra o IP com `ipconfig`).
+2. No celular, abra **`https://SEU_IP:3000`** — digite o `https://` no começo.
+   Se o IP do PC mudar, o certificado é refeito sozinho na próxima vez que o front subir.
+3. Para tirar o aviso de "conexão não particular" (e liberar **localização** e **notificações**),
+   instale no celular a autoridade local do projeto, que fica em `https://SEU_IP:3000/mural-ca.crt`:
+   - **Android:** baixe o arquivo (no aviso, toque em *Avançado → Continuar* uma vez) e vá em
+     *Configurações → Segurança → Criptografia e credenciais → Instalar certificado → Certificado CA*.
+   - **iPhone:** abra o link no Safari, instale em *Ajustes → Perfil baixado* e depois ative em
+     *Ajustes → Geral → Sobre → Ajustes de Confiança de Certificado*.
 
-1. Backend: `npm run dev` na pasta `backend`.
-2. Frontend: **`npm run dev:https`** na pasta `frontend`.
-   Na primeira vez ele gera os certificados (usa o `openssl` que vem com o Git) e mostra o endereço:
-   `📱 No celular (mesma rede): https://SEU_IP:3000`. Se o IP do PC mudar, o certificado é refeito sozinho.
-3. No celular, abra **`https://SEU_IP:3000`**.
+> Só confie nessa autoridade nos **seus** aparelhos. A chave privada dela (`frontend/certs/ca-key.pem`)
+> fica só no seu PC e não vai para o GitHub. Depois dos testes você pode remover o certificado.
 
-O celular fala só com o front; o Next repassa `/api` para o backend, que fica fechado para a rede
-(só o próprio PC acessa a porta 4000).
-
-**Tirar o aviso de "conexão não particular" (recomendado para localização/notificações funcionarem):**
-instale no celular a autoridade local do projeto, que fica em `https://SEU_IP:3000/mural-ca.crt`.
-
-- **Android:** baixe o arquivo (no aviso, toque em *Avançado → Continuar* uma vez) e vá em
-  *Configurações → Segurança → Criptografia e credenciais → Instalar certificado → Certificado CA*.
-- **iPhone:** abra o link no Safari, instale em *Ajustes → Perfil baixado* e depois ative em
-  *Ajustes → Geral → Sobre → Ajustes de Confiança de Certificado*.
-
-> Só instale essa CA nos **seus** aparelhos. A chave privada dela (`frontend/certs/ca-key.pem`)
-> fica só no seu PC e não vai para o GitHub. Depois dos testes você pode remover o certificado do celular.
-
-Sem HTTPS também funciona: `npm run dev` e abra `http://SEU_IP:3000` (sem localização/notificações).
 Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede que você está usando.
+
+<details>
+<summary>Rodar sem HTTPS (não recomendado)</summary>
+
+`npm run dev:http` na pasta `frontend` e abra `http://localhost:3000`. Nesse modo o navegador
+**não libera** localização nem notificações, e a conexão não é criptografada.
+</details>
 
 ## Funcionalidades
 
@@ -151,7 +165,7 @@ faturamento ativado. Por isso o projeto funciona assim:
 
 A chave fica **só no backend**, nunca vai para o navegador.
 
-## Rotas da API (`http://localhost:4000/api`)
+## Rotas da API (acessadas pelo navegador em `https://localhost:3000/api`)
 
 | Método | Rota                     | O que faz                                  |
 |--------|--------------------------|--------------------------------------------|

@@ -1,4 +1,4 @@
-// Gera certificados HTTPS locais para o "npm run dev:https" (usa o openssl que vem com o Git).
+// Gera certificados HTTPS locais para o "npm run dev" (usa o openssl que vem com o Git).
 //
 // - certs/ca.pem + ca-key.pem: uma autoridade certificadora (CA) só deste PC
 // - certs/server.pem + server-key.pem: certificado do site para localhost + IPs da rede
@@ -84,4 +84,5 @@ if (serverCertIsValid()) {
 fs.mkdirSync(path.join(root, 'public'), { recursive: true });
 fs.copyFileSync(file('ca.pem'), path.join(root, 'public', 'mural-ca.crt'));
 
+console.log('💻 No PC: https://localhost:3000');
 for (const ip of lanIPs) console.log(`📱 No celular (mesma rede): https://${ip}:3000`);

@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT) || 4000;
 // Por padrão a API só aceita conexões do próprio PC: o navegador (PC ou celular)
 // fala com o front, e o Next repassa /api para cá. Use HOST=0.0.0.0 para expor na rede.
 const HOST = process.env.HOST || '127.0.0.1';
-const FRONT_URL = process.env.FRONT_URL || 'http://localhost:3000';
+const FRONT_URL = process.env.FRONT_URL || 'https://localhost:3000';
 
 // CORS só importa se alguém chamar a API direto (NEXT_PUBLIC_API_URL): front configurado
 // ou front aberto pelo IP da rede local, em http ou https
@@ -37,6 +37,7 @@ app.use(errorHandler);
 
 app.listen(PORT, HOST, () => {
   console.log(`API rodando em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api`);
-  for (const ip of lanIPs()) console.log(`  no celular (mesma rede), abra o front:  https://${ip}:3000  ou  http://${ip}:3000`);
+  console.log('  abra o front em:  https://localhost:3000');
+  for (const ip of lanIPs()) console.log(`  no celular (mesma rede):  https://${ip}:3000`);
   console.log(`Clima via ${process.env.GOOGLE_WEATHER_API_KEY ? 'Google Weather API' : 'Open-Meteo (sem chave)'}`);
 });

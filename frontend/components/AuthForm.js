@@ -85,10 +85,9 @@ export default function AuthForm({ mode }) {
         >
           📌
         </motion.div>
-        <p className="auth-brand">Colaí</p>
         <h1>{isRegister ? 'Crie seu mural' : 'Bem-vindo de volta'}</h1>
         <p className="auth-sub">
-          {isRegister ? 'Cole aí suas notas, lembretes e datas especiais.' : 'Entre para ver seus post-its.'}
+          {isRegister ? 'Suas notas, lembretes e datas especiais num só lugar.' : 'Entre para ver seus post-its.'}
         </p>
 
         {isRegister && (

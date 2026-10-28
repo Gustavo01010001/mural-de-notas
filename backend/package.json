@@ -1,7 +1,7 @@
 {
-  "name": "colai-backend",
+  "name": "mural-de-notas-backend",
   "version": "1.0.0",
-  "description": "API do Colaí (Express + SQLite)",
+  "description": "API do Mural de Notas (Express + SQLite)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

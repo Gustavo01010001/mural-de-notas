@@ -103,7 +103,7 @@ async function cityName(lat, lon) {
   try {
     const d = await getJson(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&accept-language=pt-BR`,
-      { 'User-Agent': 'colai-app/1.0' },
+      { 'User-Agent': 'mural-de-notas/1.0' },
     );
     const a = d.address ?? {};
     return a.city || a.town || a.village || a.municipality || a.state || null;

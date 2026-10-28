@@ -1,6 +1,4 @@
-# 📌 Colaí
-
-> **Cola aí** suas ideias, lembretes e datas especiais.
+# 📌 Mural de Notas
 
 Bloco de notas online em formato de **post-its animados** sobre um painel preto,
 com **clima e hora** animados no canto, **pastas** por assunto, **busca** e
@@ -33,10 +31,10 @@ Navegador (PC/celular) ══HTTPS══►  Front (Next.js)  ──/api──�
 ## Rodando no VS Code
 
 ```bash
-git clone https://github.com/Gustavo01010001/colai.git
+git clone https://github.com/Gustavo01010001/mural-de-notas.git
 ```
 
-Abra a pasta `colai` no VS Code e use **dois terminais**:
+Abra a pasta `mural-de-notas` no VS Code e use **dois terminais**:
 
 **Terminal 1 — backend:**
 ```bash
@@ -200,7 +198,7 @@ A chave fica **só no backend**, nunca vai para o navegador.
 ## Estrutura
 
 ```
-colai/
+mural-de-notas/
 ├── backend/
 │   └── src/
 │       ├── config/db.js          # conexão e tabelas do SQLite

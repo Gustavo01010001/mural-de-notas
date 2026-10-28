@@ -1,8 +1,8 @@
 {
-  "name": "colai-frontend",
+  "name": "mural-de-notas-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "Front do Colaí (Next.js) - só a parte visual",
+  "description": "Front do Mural de Notas (Next.js) - só a parte visual",
   "scripts": {
     "dev": "node scripts/gen-cert.mjs && next dev -H 0.0.0.0 -p 3000 --experimental-https --experimental-https-key certs/server-key.pem --experimental-https-cert certs/server.pem --experimental-https-ca certs/ca.pem",
     "dev:https": "npm run dev",

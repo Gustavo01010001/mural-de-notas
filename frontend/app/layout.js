@@ -6,9 +6,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-ui' });
 const caveat = Caveat({ subsets: ['latin'], weight: ['500', '700'], variable: '--font-hand' });
 
 export const metadata = {
-  title: 'Colaí',
-  description: 'Colaí — cole aí suas ideias: post-its animados, pastas, clima e lembretes de datas.',
-  applicationName: 'Colaí',
+  title: 'Mural de Notas',
+  description: 'Bloco de notas online com post-its animados, pastas, busca, clima e lembretes de datas.',
+  applicationName: 'Mural de Notas',
 };
 
 export default function RootLayout({ children }) {

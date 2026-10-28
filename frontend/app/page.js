@@ -499,7 +499,7 @@ export default function BoardPage() {
         <motion.div className="brand" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
           <span className="brand-pin">📌</span>
           <div className="brand-text">
-            <strong>Colaí</strong>
+            <strong>Mural de Notas</strong>
             <small>{user ? `${notes.length} post-it${notes.length === 1 ? '' : 's'} aqui` : 'carregando...'}</small>
           </div>
         </motion.div>

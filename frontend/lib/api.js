@@ -1,6 +1,14 @@
 // Única porta de saída do front para o back.
 // O front só envia o que o usuário digitou e mostra o que o back responder.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// Sem NEXT_PUBLIC_API_URL, usa o mesmo endereço de onde a página foi aberta, na porta 4000.
+// Assim funciona tanto em http://localhost:3000 quanto pelo IP da rede (ex.: celular em http://192.168.0.10:3000).
+function resolveApiUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') return `${window.location.protocol}//${window.location.hostname}:4000/api`;
+  return 'http://localhost:4000/api';
+}
+
+const API_URL = resolveApiUrl();
 const TOKEN_KEY = 'mural_token';
 
 export class ApiError extends Error {

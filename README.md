@@ -45,6 +45,19 @@ npm run dev
 
 Acesse **http://localhost:3000**, crie sua conta em *Cadastre-se* e comece a colar post-its.
 
+## 📱 Testar no celular (mesma rede Wi-Fi)
+
+1. Rode backend e frontend normalmente (`npm run dev` em cada pasta).
+2. Descubra o IP do computador: no terminal do backend aparece `na rede local: http://SEU_IP:4000/api`,
+   ou rode `ipconfig` e procure **Endereço IPv4** do Wi-Fi (ex.: `192.168.0.10`).
+3. No celular, abra **`http://SEU_IP:3000`**.
+
+O front descobre sozinho a API no mesmo IP (porta 4000) e o backend aceita origens da rede local.
+Se não abrir, libere o Node.js no Firewall do Windows para a rede que você está usando.
+
+> Pelo IP (http), o navegador do celular **não libera localização nem notificações**, porque elas
+> exigem HTTPS. O clima usa São Paulo como padrão nesse caso; o resto funciona normalmente.
+
 ## Funcionalidades
 
 - **Cadastro e login** (senha com hash `scrypt`, sessão por token).

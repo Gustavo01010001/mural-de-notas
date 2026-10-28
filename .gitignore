@@ -17,6 +17,13 @@ backend/data/
 .env.*
 !.env.example
 
+# Certificados HTTPS locais (contêm CHAVES PRIVADAS) — cada PC gera os seus com "npm run cert"
+certs/
+*.pem
+*.key
+*.srl
+frontend/public/mural-ca.crt
+
 # Configurações locais do editor/ferramentas
 .claude/
 .vscode/

@@ -45,18 +45,32 @@ npm run dev
 
 Acesse **http://localhost:3000**, crie sua conta em *Cadastre-se* e comece a colar post-its.
 
-## 📱 Testar no celular (mesma rede Wi-Fi)
+## 📱 Testar no celular com HTTPS (mesma rede Wi-Fi)
 
-1. Rode backend e frontend normalmente (`npm run dev` em cada pasta).
-2. Descubra o IP do computador: no terminal do backend aparece `na rede local: http://SEU_IP:4000/api`,
-   ou rode `ipconfig` e procure **Endereço IPv4** do Wi-Fi (ex.: `192.168.0.10`).
-3. No celular, abra **`http://SEU_IP:3000`**.
+O navegador só libera **localização** (clima da sua cidade) e **notificações** em HTTPS.
 
-O front descobre sozinho a API no mesmo IP (porta 4000) e o backend aceita origens da rede local.
-Se não abrir, libere o Node.js no Firewall do Windows para a rede que você está usando.
+1. Backend: `npm run dev` na pasta `backend`.
+2. Frontend: **`npm run dev:https`** na pasta `frontend`.
+   Na primeira vez ele gera os certificados (usa o `openssl` que vem com o Git) e mostra o endereço:
+   `📱 No celular (mesma rede): https://SEU_IP:3000`. Se o IP do PC mudar, o certificado é refeito sozinho.
+3. No celular, abra **`https://SEU_IP:3000`**.
 
-> Pelo IP (http), o navegador do celular **não libera localização nem notificações**, porque elas
-> exigem HTTPS. O clima usa São Paulo como padrão nesse caso; o resto funciona normalmente.
+O celular fala só com o front; o Next repassa `/api` para o backend, que fica fechado para a rede
+(só o próprio PC acessa a porta 4000).
+
+**Tirar o aviso de "conexão não particular" (recomendado para localização/notificações funcionarem):**
+instale no celular a autoridade local do projeto, que fica em `https://SEU_IP:3000/mural-ca.crt`.
+
+- **Android:** baixe o arquivo (no aviso, toque em *Avançado → Continuar* uma vez) e vá em
+  *Configurações → Segurança → Criptografia e credenciais → Instalar certificado → Certificado CA*.
+- **iPhone:** abra o link no Safari, instale em *Ajustes → Perfil baixado* e depois ative em
+  *Ajustes → Geral → Sobre → Ajustes de Confiança de Certificado*.
+
+> Só instale essa CA nos **seus** aparelhos. A chave privada dela (`frontend/certs/ca-key.pem`)
+> fica só no seu PC e não vai para o GitHub. Depois dos testes você pode remover o certificado do celular.
+
+Sem HTTPS também funciona: `npm run dev` e abra `http://SEU_IP:3000` (sem localização/notificações).
+Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede que você está usando.
 
 ## Funcionalidades
 

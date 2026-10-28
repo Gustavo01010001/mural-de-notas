@@ -5,6 +5,8 @@
   "description": "Front do Mural de Notas (Next.js) - só a parte visual",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
+    "dev:https": "node scripts/gen-cert.mjs && next dev -H 0.0.0.0 -p 3000 --experimental-https --experimental-https-key certs/server-key.pem --experimental-https-cert certs/server.pem --experimental-https-ca certs/ca.pem",
+    "cert": "node scripts/gen-cert.mjs",
     "build": "next build",
     "start": "next start -p 3000"
   },

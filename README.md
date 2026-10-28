@@ -1,8 +1,10 @@
-# 📌 Mural de Notas — projeto2.0
+# 📌 Colaí
+
+> **Cola aí** suas ideias, lembretes e datas especiais.
 
 Bloco de notas online em formato de **post-its animados** sobre um painel preto,
-com **clima e hora** animados no canto e **alertas de datas importantes**
-(ex.: aniversários).
+com **clima e hora** animados no canto, **pastas** por assunto, **busca** e
+**alertas de datas importantes** (ex.: aniversários).
 
 | Camada   | Tecnologia                                  | Pasta       |
 |----------|---------------------------------------------|-------------|
@@ -30,7 +32,11 @@ Navegador (PC/celular) ══HTTPS══►  Front (Next.js)  ──/api──�
 
 ## Rodando no VS Code
 
-Abra a pasta `projeto2.0` no VS Code e use **dois terminais**:
+```bash
+git clone https://github.com/Gustavo01010001/colai.git
+```
+
+Abra a pasta `colai` no VS Code e use **dois terminais**:
 
 **Terminal 1 — backend:**
 ```bash
@@ -194,7 +200,7 @@ A chave fica **só no backend**, nunca vai para o navegador.
 ## Estrutura
 
 ```
-projeto2.0/
+colai/
 ├── backend/
 │   └── src/
 │       ├── config/db.js          # conexão e tabelas do SQLite

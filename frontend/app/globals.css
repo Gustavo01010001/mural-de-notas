@@ -1050,6 +1050,18 @@ a {
   text-align: center;
 }
 
+.auth-brand {
+  margin: -6px 0 0;
+  text-align: center;
+  font-family: var(--font-hand), cursive;
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--yellow), var(--pink), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .auth-card h1 {
   margin: 0;
   text-align: center;

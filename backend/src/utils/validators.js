@@ -35,6 +35,9 @@ export function validateNote(body = {}) {
   if (title.length > 80) throw new HttpError(400, 'Título muito longo (máx. 80).');
   if (content.length > 1000) throw new HttpError(400, 'Texto muito longo (máx. 1000).');
 
+  const checklist = validateChecklist(body.checklist);
+  const tags = validateTags(body.tags);
+
   let eventDate = body.eventDate ? String(body.eventDate) : null;
   let eventType = null;
   let repeatYearly = false;
@@ -46,7 +49,83 @@ export function validateNote(body = {}) {
     repeatYearly = eventType === 'birthday' ? true : Boolean(body.repeatYearly);
   }
 
-  return { title, content, color, eventDate, eventType, repeatYearly };
+  return { title, content, color, checklist, tags, eventDate, eventType, repeatYearly };
+}
+
+const MAX_CHECK_ITEMS = 30;
+const MAX_TAGS = 6;
+
+export function validateChecklist(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new HttpError(400, 'Checklist inválida.');
+  if (raw.length > MAX_CHECK_ITEMS) throw new HttpError(400, `A checklist pode ter no máximo ${MAX_CHECK_ITEMS} itens.`);
+  return raw
+    .map((item, i) => {
+      const text = String(item?.text ?? '').trim();
+      if (text.length > 120) throw new HttpError(400, 'Item da checklist muito longo (máx. 120).');
+      const id = /^[a-z0-9-]{1,40}$/i.test(item?.id ?? '') ? item.id : `i${Date.now().toString(36)}${i}`;
+      return { id, text, done: Boolean(item?.done) };
+    })
+    .filter((item) => item.text);
+}
+
+// Etiquetas: minúsculas, sem "#", só letras/números/-/_ (acentos permitidos)
+export function validateTags(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new HttpError(400, 'Etiquetas inválidas.');
+  const tags = [];
+  for (const t of raw) {
+    const tag = String(t ?? '')
+      .trim()
+      .replace(/^#+/, '')
+      .toLowerCase()
+      .replace(/\s+/g, '-');
+    if (!tag) continue;
+    if (tag.length > 20 || !/^[\p{L}\p{N}_-]+$/u.test(tag)) {
+      throw new HttpError(400, `Etiqueta inválida: "${String(t).slice(0, 25)}". Use letras, números, - ou _ (máx. 20).`);
+    }
+    if (!tags.includes(tag)) tags.push(tag);
+  }
+  if (tags.length > MAX_TAGS) throw new HttpError(400, `No máximo ${MAX_TAGS} etiquetas por post-it.`);
+  return tags;
+}
+
+export function validateSize(body = {}) {
+  const width = Number(body.width);
+  const height = Number(body.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) throw new HttpError(400, 'Tamanho inválido.');
+  return {
+    width: Math.round(Math.min(Math.max(width, 160), 520)),
+    height: Math.round(Math.min(Math.max(height, 140), 640)),
+  };
+}
+
+// Foto: chega como "data:image/...;base64,..." (o front já reduz para ~1000px)
+const IMAGE_TYPES = {
+  'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  'image/png': (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47,
+  'image/webp': (b) => b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP',
+};
+export const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+
+export function validateImage(body = {}) {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.dataUrl ?? ''));
+  if (!m) throw new HttpError(400, 'Envie uma imagem JPG, PNG ou WEBP.');
+  const data = Buffer.from(m[2], 'base64');
+  if (data.length > MAX_IMAGE_BYTES) throw new HttpError(413, 'Imagem muito grande (máx. 1,5 MB).');
+  // confere o conteúdo de verdade, não só o que o nome diz
+  if (!IMAGE_TYPES[m[1]](data)) throw new HttpError(400, 'O arquivo não é uma imagem válida.');
+  return { mime: m[1], data };
+}
+
+export function validateBatch(body = {}) {
+  const ids = Array.isArray(body.ids) ? [...new Set(body.ids.map(Number))] : [];
+  if (!ids.length || ids.length > 200 || !ids.every((id) => Number.isInteger(id) && id > 0)) {
+    throw new HttpError(400, 'Selecione de 1 a 200 post-its.');
+  }
+  const action = body.action;
+  if (!['move', 'archive', 'delete', 'pin', 'unpin'].includes(action)) throw new HttpError(400, 'Ação inválida.');
+  return { ids, action };
 }
 
 export function validatePosition(body = {}) {

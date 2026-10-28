@@ -67,7 +67,7 @@ navegador mostra **"Sua conexão não é particular"**. Para o cadeado aparecer 
 
 ## 🧪 Testes
 
-- `npm test` na pasta `backend`: 25 testes automáticos da API (usam um banco temporário).
+- `npm test` na pasta `backend`: 37 testes automáticos da API (usam um banco temporário).
 - Relatório completo dos testes de PC e celular: [TESTES.md](TESTES.md).
 
 ## 📱 Usar no celular (mesma rede Wi-Fi)
@@ -109,6 +109,21 @@ Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede qu
   - O back verifica a cada minuto, então o alerta aparece mesmo se a página ficar aberta virando o dia.
 - **Clima + relógio** no canto: ícones animados (sol girando, nuvens, chuva, raios, neve, lua com
   estrelas), temperatura, mín/máx, sensação, umidade, vento, cidade e saudação ("Boa noite, Fulano!").
+
+## 🗑️ Lixeira, desfazer e organização dos post-its
+
+- **Excluir não apaga na hora:** aparece "Post-it foi para a lixeira · **Desfazer**" (ou **Ctrl+Z**).
+  O post-it fica **30 dias** na **Lixeira** (no seletor de pastas), onde dá para restaurar ou apagar de vez.
+- **Arquivar:** tira do mural sem apagar (também com Desfazer). Fica em **📦 Arquivados**.
+- **Fixar (📌):** o post-it fica por cima de todos e em primeiro na grade do celular e ao arrumar.
+- **Menu ⋯ do post-it:** duplicar, selecionar, arquivar, excluir.
+- **Checklist:** itens com ☐/☑ direto no post-it e barrinha de progresso (com aviso quando completa).
+- **Etiquetas (#urgente, #ideia):** clique numa etiqueta para filtrar o mural; na busca, `#etiqueta`.
+- **Links clicáveis** no texto e **foto** no post-it (o app reduz a foto antes de enviar: 5 MB viram ~15–300 KB).
+- **Tamanho:** arraste o cantinho inferior direito do post-it (no PC).
+- **Selecionar vários:** botão ☑ Selecionar (ou Shift+clique) → mover para pasta, fixar, arquivar ou excluir de uma vez.
+- **▦ Arrumar:** organiza a pasta em grade com animação (fixados primeiro).
+- **Zoom:** – 100% + no canto (ou Ctrl + rodinha do mouse), de 40% a 160%.
 
 ## 📁 Pastas e 🔍 busca (para quem escreve muito)
 
@@ -187,7 +202,19 @@ A chave fica **só no backend**, nunca vai para o navegador.
 | POST   | `/notes`                 | Cria post-it                               |
 | PUT    | `/notes/:id`             | Edita post-it                              |
 | PATCH  | `/notes/:id/position`    | Salva posição ao arrastar                  |
-| DELETE | `/notes/:id`             | Exclui post-it                             |
+| DELETE | `/notes/:id`             | Manda o post-it para a lixeira             |
+| POST   | `/notes/:id/restore`     | Tira da lixeira (desfazer)                 |
+| DELETE | `/notes/:id/permanent`   | Apaga de vez (só quem está na lixeira)     |
+| GET/DELETE | `/notes/trash`       | Lista / esvazia a lixeira                  |
+| GET    | `/notes/archived`        | Lista os arquivados                        |
+| POST   | `/notes/:id/archive`     | Arquiva / desarquiva                       |
+| POST   | `/notes/:id/pin`         | Fixa / desafixa                            |
+| POST   | `/notes/:id/duplicate`   | Duplica                                    |
+| PATCH  | `/notes/:id/checklist/:item` | Marca item da checklist                |
+| PATCH  | `/notes/:id/size`        | Salva o tamanho                            |
+| GET/PUT/DELETE | `/notes/:id/image` | Foto do post-it                          |
+| POST   | `/notes/batch`           | Mover/fixar/arquivar/excluir vários        |
+| POST   | `/notes/arrange`         | Arrumar a pasta em grade                   |
 | GET    | `/alerts`                | Alertas de hoje + próximos 7 dias          |
 | POST   | `/alerts/:id/dismiss`    | Fecha o alerta (não aparece mais hoje)     |
 | GET    | `/settings`              | Configurações do usuário                   |

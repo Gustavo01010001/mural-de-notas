@@ -69,9 +69,31 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id);
 `);
 
-// Migração: bancos criados antes das pastas não têm notes.folder_id
+// Migrações: bancos antigos ganham as colunas novas sem perder nada
+const NOTE_MIGRATIONS = {
+  folder_id: 'INTEGER REFERENCES folders(id) ON DELETE SET NULL',
+  deleted_at: 'TEXT', // na lixeira desde (apagado de vez depois de 30 dias)
+  archived_at: 'TEXT', // arquivado (sai do mural, mas não é apagado)
+  pinned: 'INTEGER NOT NULL DEFAULT 0', // fixado no topo
+  checklist: "TEXT NOT NULL DEFAULT '[]'", // [{ id, text, done }]
+  tags: "TEXT NOT NULL DEFAULT '[]'", // ["urgente", "ideia"]
+  width: 'REAL', // tamanho escolhido pelo usuário (null = padrão)
+  height: 'REAL',
+};
 const noteColumns = db.prepare('PRAGMA table_info(notes)').all().map((c) => c.name);
-if (!noteColumns.includes('folder_id')) {
-  db.exec('ALTER TABLE notes ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL');
+for (const [col, type] of Object.entries(NOTE_MIGRATIONS)) {
+  if (!noteColumns.includes(col)) db.exec(`ALTER TABLE notes ADD COLUMN ${col} ${type}`);
 }
-db.exec('CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(user_id, folder_id)');
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(user_id, folder_id);
+
+  -- Foto do post-it (uma por post-it), guardada no próprio banco
+  CREATE TABLE IF NOT EXISTS note_images (
+    note_id    INTEGER PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mime       TEXT NOT NULL,
+    data       BLOB NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);

@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { COLORS, EVENT_TYPES } from '@/lib/format';
+import { compressImage, parseTagInput, tagColor } from '@/lib/noteHelpers';
+import { noteImageUrl } from '@/lib/api';
 
 const EMPTY = {
   title: '',
   content: '',
   color: 'yellow',
+  checklist: [],
+  tags: [],
   hasDate: false,
   eventDate: '',
   eventType: 'birthday',
   repeatYearly: true,
 };
+
+const newItemId = () => `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function fromNote(note, defaultColor, currentFolder) {
   if (!note) return { ...EMPTY, color: defaultColor ?? EMPTY.color, folderId: currentFolder ?? null };
@@ -21,6 +27,8 @@ function fromNote(note, defaultColor, currentFolder) {
     title: note.title,
     content: note.content,
     color: note.color,
+    checklist: note.checklist ?? [],
+    tags: note.tags ?? [],
     hasDate: Boolean(note.eventDate),
     eventDate: note.eventDate ?? '',
     eventType: note.eventType ?? 'birthday',
@@ -31,10 +39,56 @@ function fromNote(note, defaultColor, currentFolder) {
 export default function NoteModal({ open, note, defaultColor, folders = [], currentFolder = null, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [newItem, setNewItem] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  // foto: "keep" = não mexe; { dataUrl } = nova; "remove" = tirar
+  const [image, setImage] = useState('keep');
+  const [preview, setPreview] = useState(null);
+  const [imageError, setImageError] = useState('');
+  const fileRef = useRef(null);
 
   useEffect(() => {
-    if (open) setForm(fromNote(note, defaultColor, currentFolder));
+    if (!open) return;
+    setForm(fromNote(note, defaultColor, currentFolder));
+    setNewItem('');
+    setTagInput('');
+    setImage('keep');
+    setImageError('');
+    setPreview(null);
+    if (note?.hasImage) noteImageUrl(note.id, note.updatedAt).then(setPreview).catch(() => {});
   }, [open, note, defaultColor, currentFolder]);
+
+  function addItem() {
+    const text = newItem.trim();
+    if (!text) return;
+    setForm((f) => ({ ...f, checklist: [...f.checklist, { id: newItemId(), text, done: false }] }));
+    setNewItem('');
+  }
+
+  const updateItem = (id, patch) =>
+    setForm((f) => ({ ...f, checklist: f.checklist.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+  const removeItem = (id) => setForm((f) => ({ ...f, checklist: f.checklist.filter((i) => i.id !== id) }));
+
+  function addTags(value = tagInput) {
+    const tags = parseTagInput(value);
+    if (!tags.length) return;
+    setForm((f) => ({ ...f, tags: [...new Set([...f.tags, ...tags])].slice(0, 6) }));
+    setTagInput('');
+  }
+
+  async function pickImage(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImageError('');
+    try {
+      const dataUrl = await compressImage(file);
+      setImage({ dataUrl });
+      setPreview(dataUrl);
+    } catch (err) {
+      setImageError(err.message);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -50,15 +104,23 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
     e.preventDefault();
     setSaving(true);
     // Só repassa o que foi digitado; quem valida e salva é o back
-    const ok = await onSave({
-      folderId: form.folderId,
-      title: form.title,
-      content: form.content,
-      color: form.color,
-      eventDate: form.hasDate ? form.eventDate : null,
-      eventType: form.hasDate ? form.eventType : null,
-      repeatYearly: form.hasDate && (form.eventType === 'birthday' || form.repeatYearly),
-    });
+    // etiqueta digitada e não confirmada com Enter também entra
+    const pendingTags = parseTagInput(tagInput);
+    const pendingItem = newItem.trim();
+    const ok = await onSave(
+      {
+        folderId: form.folderId,
+        title: form.title,
+        content: form.content,
+        color: form.color,
+        checklist: pendingItem ? [...form.checklist, { id: newItemId(), text: pendingItem, done: false }] : form.checklist,
+        tags: [...new Set([...form.tags, ...pendingTags])],
+        eventDate: form.hasDate ? form.eventDate : null,
+        eventType: form.hasDate ? form.eventType : null,
+        repeatYearly: form.hasDate && (form.eventType === 'birthday' || form.repeatYearly),
+      },
+      image,
+    );
     setSaving(false);
     if (ok) onClose();
   }
@@ -99,6 +161,118 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
               maxLength={1000}
               rows={4}
             />
+
+            {/* Checklist */}
+            <div className="modal-section">
+              <span className="modal-label">☑️ Checklist</span>
+              <AnimatePresence initial={false}>
+                {form.checklist.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    className={`check-edit ${item.done ? 'done' : ''}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <input type="checkbox" checked={item.done} onChange={(e) => updateItem(item.id, { done: e.target.checked })} aria-label="Feito" />
+                    <input
+                      className="check-edit-text"
+                      value={item.text}
+                      maxLength={120}
+                      onChange={(e) => updateItem(item.id, { text: e.target.value })}
+                    />
+                    <button type="button" className="icon-mini" onClick={() => removeItem(item.id)} aria-label="Remover item">
+                      ✕
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {form.checklist.length < 30 && (
+                <div className="check-add">
+                  <input
+                    placeholder="+ Adicionar item (Enter)"
+                    value={newItem}
+                    maxLength={120}
+                    onChange={(e) => setNewItem(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addItem();
+                      }
+                    }}
+                  />
+                  <button type="button" className="icon-mini" onClick={addItem} aria-label="Adicionar item">
+                    ＋
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Etiquetas */}
+            <div className="modal-section">
+              <span className="modal-label">🏷️ Etiquetas</span>
+              <div className="tag-edit">
+                {form.tags.map((t) => (
+                  <span key={t} className="tag-chip" style={{ background: tagColor(t) }}>
+                    #{t}
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))} aria-label={`Tirar #${t}`}>
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                {form.tags.length < 6 && (
+                  <input
+                    placeholder={form.tags.length ? '+ etiqueta' : 'ex: urgente, ideia (Enter)'}
+                    value={tagInput}
+                    maxLength={40}
+                    onChange={(e) => {
+                      // vírgula ou espaço já confirmam a etiqueta
+                      if (/[,\s]$/.test(e.target.value)) addTags(e.target.value);
+                      else setTagInput(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTags();
+                      } else if (e.key === 'Backspace' && !tagInput && form.tags.length) {
+                        setForm((f) => ({ ...f, tags: f.tags.slice(0, -1) }));
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Foto */}
+            <div className="modal-section">
+              <span className="modal-label">📷 Foto</span>
+              {preview && image !== 'remove' ? (
+                <div className="image-preview">
+                  <img src={preview} alt="Prévia da foto" />
+                  <div>
+                    <button type="button" className="btn-ghost small" onClick={() => fileRef.current?.click()}>
+                      Trocar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      onClick={() => {
+                        setImage(note?.hasImage ? 'remove' : 'keep');
+                        setPreview(null);
+                      }}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="image-pick" onClick={() => fileRef.current?.click()}>
+                  + Adicionar foto (ex.: foto da receita)
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickImage} />
+              {imageError && <small className="modal-error">{imageError}</small>}
+            </div>
 
             <div className="color-row" role="radiogroup" aria-label="Cor">
               {COLORS.map((c) => (

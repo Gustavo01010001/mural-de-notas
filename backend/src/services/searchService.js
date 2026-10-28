@@ -20,17 +20,28 @@ export function searchNotes(userId, query) {
 
   const folders = new Map(FolderModel.listByUser(userId).map((f) => [f.id, f]));
 
-  return NoteModel.listAll(userId)
+  return NoteModel.listSearchable(userId)
     .map((note) => {
       const title = normalize(note.title);
-      const content = normalize(note.content);
+      // checklist também conta como texto do post-it
+      const content = normalize([note.content, ...note.checklist.map((i) => i.text)].join(' '));
+      const tags = note.tags.map(normalize);
       let score = 0;
-      for (const t of terms) {
+      for (const raw of terms) {
+        // "#urgente" procura só nas etiquetas
+        if (raw.startsWith('#')) {
+          if (!tags.includes(raw.slice(1))) return null;
+          score += 4;
+          continue;
+        }
+        const t = raw;
         const inTitle = title.includes(t);
         const inContent = content.includes(t);
-        if (!inTitle && !inContent) return null;
-        score += (inTitle ? 3 : 0) + (inContent ? 1 : 0) + (title.startsWith(t) ? 2 : 0);
+        const inTags = tags.some((tag) => tag.includes(t));
+        if (!inTitle && !inContent && !inTags) return null;
+        score += (inTitle ? 3 : 0) + (inContent ? 1 : 0) + (inTags ? 2 : 0) + (title.startsWith(t) ? 2 : 0);
       }
+      if (note.status === 'archived') score -= 1; // arquivados aparecem, mas depois
       const folder = note.folderId ? folders.get(note.folderId) : null;
       return {
         score,

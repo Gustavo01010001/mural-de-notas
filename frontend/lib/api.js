@@ -30,10 +30,28 @@ export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {}
+  // ao sair, esquece as fotos carregadas nesta aba
+  for (const url of imageCache.values()) URL.revokeObjectURL(url);
+  imageCache.clear();
 }
 
 export function userTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+// Baixa a foto de um post-it (precisa do token) e devolve um endereço local para o <img>
+const imageCache = new Map();
+export async function noteImageUrl(noteId, version) {
+  const key = `${noteId}:${version}`;
+  if (imageCache.has(key)) return imageCache.get(key);
+  const res = await fetch(`${API_URL}/notes/${noteId}/image`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new ApiError('Foto indisponível.', res.status);
+  const url = URL.createObjectURL(await res.blob());
+  imageCache.set(key, url);
+  return url;
 }
 
 export async function api(path, { method = 'GET', body } = {}) {

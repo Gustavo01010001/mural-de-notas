@@ -113,7 +113,18 @@ function FolderRow({ folder, active, onSelect, onRename, onDelete }) {
   );
 }
 
-export default function FolderSwitcher({ folders, rootCount, current, onSelect, onCreate, onRename, onDelete }) {
+export default function FolderSwitcher({
+  folders,
+  rootCount,
+  archivedCount = 0,
+  trashCount = 0,
+  current,
+  onSelect,
+  onCreate,
+  onRename,
+  onDelete,
+  onOpenSpecial,
+}) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const ref = useRef(null);
@@ -230,6 +241,27 @@ export default function FolderSwitcher({ folders, rootCount, current, onSelect, 
                 </motion.button>
               )}
             </AnimatePresence>
+
+            <div className="folder-special">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenSpecial('archive');
+                }}
+              >
+                📦 Arquivados <span className="folder-count">{archivedCount}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenSpecial('trash');
+                }}
+              >
+                🗑️ Lixeira <span className="folder-count">{trashCount}</span>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

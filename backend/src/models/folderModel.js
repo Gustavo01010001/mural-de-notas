@@ -16,7 +16,7 @@ export const FolderModel = {
   listByUser(userId) {
     return db
       .prepare(
-        `SELECT f.*, (SELECT COUNT(*) FROM notes n WHERE n.folder_id = f.id) AS note_count
+        `SELECT f.*, (SELECT COUNT(*) FROM notes n WHERE n.folder_id = f.id AND n.deleted_at IS NULL AND n.archived_at IS NULL) AS note_count
            FROM folders f WHERE f.user_id = ? ORDER BY f.created_at ASC, f.id ASC`,
       )
       .all(userId)
@@ -25,14 +25,14 @@ export const FolderModel = {
 
   // Quantos post-its estão soltos no "Mural geral" (sem pasta)
   countRoot(userId) {
-    return db.prepare('SELECT COUNT(*) AS c FROM notes WHERE user_id = ? AND folder_id IS NULL').get(userId).c;
+    return db.prepare('SELECT COUNT(*) AS c FROM notes WHERE user_id = ? AND folder_id IS NULL AND deleted_at IS NULL AND archived_at IS NULL').get(userId).c;
   },
 
   findById(userId, id) {
     return toFolder(
       db
         .prepare(
-          `SELECT f.*, (SELECT COUNT(*) FROM notes n WHERE n.folder_id = f.id) AS note_count
+          `SELECT f.*, (SELECT COUNT(*) FROM notes n WHERE n.folder_id = f.id AND n.deleted_at IS NULL AND n.archived_at IS NULL) AS note_count
              FROM folders f WHERE f.id = ? AND f.user_id = ?`,
         )
         .get(id, userId),

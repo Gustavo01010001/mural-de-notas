@@ -62,3 +62,30 @@ Feito com um usuário novo, do cadastro até sair da conta, com 25 post-its em 3
 - Notificação do navegador e localização real (dependem da permissão no aparelho).
 - Virada de meia-noite com a página aberta (a lógica existe: o app confere a cada minuto).
 - Navegadores Firefox e Safari.
+
+---
+
+# ✅ Rodada 2 — Lixeira, desfazer e organização (27/10/2026)
+
+**Testes automáticos: 37 de 37 passando** (12 novos).
+
+| Área | O que é verificado |
+|------|--------------------|
+| Lixeira | excluir some do mural, dos alertas e da busca; aparece na lixeira (30 dias); não dá para editar; restaurar; apagar de vez só da lixeira; esvaziar |
+| Arquivar/fixar | arquivado sai do mural, vai para Arquivados, aparece na busca e volta |
+| Checklist | itens vazios descartados, marcar item, limite de 30, formato inválido |
+| Etiquetas | normaliza (#Urgente → urgente), sem repetidas, máx. 6, caracteres inválidos, busca `#etiqueta` |
+| Duplicar / tamanho | copia texto, checklist, etiquetas e foto, desloca 30px; tamanho com limites |
+| Lote / arrumar | mover, arquivar e excluir vários; ações inválidas; fixados primeiro na grade; outro usuário não consegue usar lote nos seus post-its |
+| Foto | enviar, ler, duplicar, remover; arquivo falso recusado; **sem login = 401**; navegador não guarda a foto em cache; outro usuário não vê |
+
+**No navegador (PC 1280px e celular 375px):** checklist marcando direto no post-it (0/3 → 1/3), link abre em
+nova aba com `noopener`, filtro por etiqueta ("2 de 5"), fixar, excluir → Desfazer, excluir → Ctrl+Z, arquivar,
+Lixeira e Arquivados com restaurar, duplicar, selecionar 2 → mover para pasta, selecionar todos → excluir →
+Desfazer, foto de 5,3 MB enviada com 15 KB, zoom 80% com arrasto correto (160px na tela = 200px no mural),
+redimensionar, arrumar em grade. No celular: fixado em 1º, menu ⋯, barra de seleção e formulário cabem na tela,
+sem rolagem lateral; zoom/arrumar/redimensionar ficam só no PC.
+
+**Problema encontrado e corrigido:** a foto ficava 5 minutos no cache do navegador — em PC compartilhado,
+outra pessoa no mesmo navegador poderia vê-la sem login. Agora a API manda `Cache-Control: no-store` e o app
+esquece as fotos ao sair da conta.

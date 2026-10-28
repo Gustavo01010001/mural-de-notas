@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, clearToken, getToken } from '@/lib/api';
 import { countdownLabel, eventIcon } from '@/lib/format';
+import { tagColor } from '@/lib/noteHelpers';
 import { useToast } from '@/components/Toasts';
 import PostIt from '@/components/PostIt';
 import NoteModal from '@/components/NoteModal';
@@ -14,6 +15,8 @@ import WeatherBackground from '@/components/WeatherBackground';
 import SettingsPanel from '@/components/SettingsPanel';
 import FolderSwitcher from '@/components/FolderSwitcher';
 import SearchPalette from '@/components/SearchPalette';
+import TrashPanel from '@/components/TrashPanel';
+import { BoardTools, SelectionBar, ZOOM_MAX, ZOOM_MIN } from '@/components/BoardTools';
 import { useWeather } from '@/lib/useWeather';
 import { resolveScene } from '@/lib/scenes';
 
@@ -40,6 +43,7 @@ const DEFAULT_SETTINGS = {
 
 const SESSION_KEY = 'mural_session_start';
 const FOLDER_KEY = 'mural_folder';
+const ZOOM_KEY = 'mural_zoom';
 const WARM_ALPHA = { off: 0, low: 0.14, high: 0.26 };
 
 // Quando o usuário começou a usar o mural nesta aba (sobrevive a recarregar a página)
@@ -58,6 +62,7 @@ function sessionStart() {
 // Ordem de leitura do mural do PC (de cima para baixo, da esquerda para a direita),
 // usada para montar a grade do celular na mesma sequência
 function readingOrder(a, b) {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1; // fixados sempre primeiro
   const rowA = Math.round(a.y / 180);
   const rowB = Math.round(b.y / 180);
   return rowA - rowB || a.x - b.x || a.id - b.id;
@@ -126,6 +131,30 @@ export default function BoardPage() {
   folderRef.current = currentFolder;
   notesRef.current = notes;
 
+  // Lixeira/arquivados, filtro por etiqueta, seleção múltipla, zoom e "arrumar"
+  const [special, setSpecial] = useState({ archived: 0, trash: 0 });
+  const [specialPanel, setSpecialPanel] = useState(null); // 'trash' | 'archive' | null
+  const [tagFilter, setTagFilter] = useState(null);
+  const [selection, setSelection] = useState(null); // null = fora do modo seleção; Set de ids
+  const [zoom, setZoomState] = useState(1);
+  const [arranging, setArranging] = useState(false);
+  const lastUndo = useRef(null); // para o Ctrl+Z
+
+  useEffect(() => {
+    try {
+      const z = Number(localStorage.getItem(ZOOM_KEY));
+      if (z >= ZOOM_MIN && z <= ZOOM_MAX) setZoomState(z);
+    } catch {}
+  }, []);
+
+  const setZoom = useCallback((z) => {
+    const value = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
+    setZoomState(value);
+    try {
+      localStorage.setItem(ZOOM_KEY, String(value));
+    } catch {}
+  }, []);
+
   const handleAuthError = useCallback(
     (err) => {
       if (err.status === 401) router.replace('/login');
@@ -148,6 +177,7 @@ export default function BoardPage() {
     const data = await api('/folders');
     setFolders(data.folders);
     setRootCount(data.rootCount);
+    setSpecial({ archived: data.archivedCount ?? 0, trash: data.trashCount ?? 0 });
     return data.folders;
   }, []);
 
@@ -205,6 +235,8 @@ export default function BoardPage() {
     } catch {}
     setNotes([]);
     setNotesLoaded(false);
+    setSelection(null);
+    setTagFilter(null);
     if (!pendingFocus.current) boardRef.current?.scrollTo({ left: 0, top: 0 });
     loadNotes(currentFolder).catch((err) => {
       if (err.status === 404) setCurrentFolder(null);
@@ -238,6 +270,11 @@ export default function BoardPage() {
 
   function handlePick(note) {
     setSearchOpen(false);
+    if (note.status === 'archived') {
+      setSpecialPanel('archive');
+      return;
+    }
+    setTagFilter(null);
     const target = note.folderId ?? null;
     if (target !== currentFolder) {
       pendingFocus.current = note.id;
@@ -312,7 +349,14 @@ export default function BoardPage() {
 
   const replaceNote = (note) => setNotes((list) => list.map((n) => (n.id === note.id ? note : n)));
 
-  async function handleSave(form) {
+  // Foto do formulário: "keep" (não mexe), { dataUrl } (nova) ou "remove"
+  async function saveImage(noteId, image) {
+    if (image === 'remove') return (await api(`/notes/${noteId}/image`, { method: 'DELETE' })).note;
+    if (image?.dataUrl) return (await api(`/notes/${noteId}/image`, { method: 'PUT', body: { dataUrl: image.dataUrl } })).note;
+    return null;
+  }
+
+  async function handleSave(form, image = 'keep') {
     // Pede permissão de notificação na primeira vez que o usuário marca uma data
     if (form.eventDate && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -321,6 +365,7 @@ export default function BoardPage() {
     try {
       if (modal.note) {
         const data = await api(`/notes/${modal.note.id}`, { method: 'PUT', body: form });
+        const withImage = (await saveImage(modal.note.id, image)) ?? data.note;
         if (targetFolder !== (modal.note.folderId ?? null)) {
           // Mudou de pasta: sai deste mural
           const moved = await api(`/notes/${modal.note.id}/folder`, { method: 'PATCH', body: { folderId: targetFolder } });
@@ -328,22 +373,29 @@ export default function BoardPage() {
           loadFolders().catch(() => {});
           toast(moved.message, 'success');
         } else {
-          replaceNote(data.note);
+          replaceNote(withImage);
           toast(data.message, 'success');
         }
       } else {
-        // Nasce numa área visível da tela (funciona no PC e no celular)
+        // Nasce numa área visível da tela (funciona no PC e no celular, com ou sem zoom)
         const board = boardRef.current;
         const mobile = window.innerWidth <= 720;
         const noteW = mobile ? 180 : 240;
+        const z = gridMode ? 1 : zoom;
         const body = {
           ...form,
-          x: (board?.scrollLeft ?? 0) + 16 + Math.random() * Math.max(10, window.innerWidth - noteW - 32),
-          y: (board?.scrollTop ?? 0) + (mobile ? 150 : 110) + Math.random() * Math.max(40, window.innerHeight - 450),
+          x: (board?.scrollLeft ?? 0) / z + 16 + Math.random() * Math.max(10, window.innerWidth / z - noteW - 32),
+          y: (board?.scrollTop ?? 0) / z + (mobile ? 150 : 110) + Math.random() * Math.max(40, window.innerHeight / z - 450),
         };
         const data = await api('/notes', { method: 'POST', body });
+        let created = data.note;
+        try {
+          created = (await saveImage(created.id, image)) ?? created;
+        } catch (err) {
+          toast(`Post-it criado, mas a foto não foi: ${err.message}`, 'error');
+        }
         if (targetFolder === currentFolder) {
-          setNotes((list) => [...list, data.note]);
+          setNotes((list) => [...list, created]);
           toast(data.message, 'success');
         } else {
           toast(`Post-it criado na pasta "${folderName(targetFolder)}".`, 'success');
@@ -357,6 +409,217 @@ export default function BoardPage() {
       return false;
     }
   }
+
+  // Mostra um aviso com "Desfazer" (o mesmo desfazer também roda com Ctrl+Z por alguns segundos)
+  function offerUndo(message, undo) {
+    const entry = { undo, until: Date.now() + 7000 };
+    lastUndo.current = entry;
+    toast(message, 'trash', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          if (lastUndo.current === entry) lastUndo.current = null;
+          undo();
+        },
+      },
+    });
+  }
+
+  // Depois de desfazer: recarrega o mural aberto, as pastas e os alertas
+  const refreshAll = useCallback(() => {
+    if (folderRef.current !== undefined) loadNotes(folderRef.current).catch(() => {});
+    loadFolders().catch(() => {});
+    loadAlerts().catch(() => {});
+  }, [loadNotes, loadFolders, loadAlerts]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
+      if (typing || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+      const entry = lastUndo.current;
+      if (entry && Date.now() < entry.until) {
+        e.preventDefault();
+        lastUndo.current = null;
+        entry.undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const dropFromBoard = (ids) => {
+    const set = new Set(ids);
+    setNotes((list) => list.filter((n) => !set.has(n.id)));
+    setAlerts((list) => list.filter((n) => !set.has(n.id)));
+    setUpcoming((list) => list.filter((n) => !set.has(n.id)));
+  };
+
+  async function handleDelete(note) {
+    try {
+      await api(`/notes/${note.id}`, { method: 'DELETE' });
+      dropFromBoard([note.id]);
+      loadFolders().catch(() => {});
+      offerUndo(`"${note.title}" foi para a lixeira.`, async () => {
+        try {
+          await api(`/notes/${note.id}/restore`, { method: 'POST' });
+          refreshAll();
+          toast('Post-it de volta! ↩', 'success');
+        } catch (err) {
+          handleAuthError(err);
+        }
+      });
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  async function handleArchive(note) {
+    try {
+      await api(`/notes/${note.id}/archive`, { method: 'POST', body: { archived: true } });
+      dropFromBoard([note.id]);
+      loadFolders().catch(() => {});
+      offerUndo(`"${note.title}" foi arquivado.`, async () => {
+        try {
+          await api(`/notes/${note.id}/archive`, { method: 'POST', body: { archived: false } });
+          refreshAll();
+        } catch (err) {
+          handleAuthError(err);
+        }
+      });
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  async function handlePin(note) {
+    // muda na tela na hora; o back confirma
+    replaceNote({ ...note, pinned: !note.pinned });
+    try {
+      const data = await api(`/notes/${note.id}/pin`, { method: 'POST', body: { pinned: !note.pinned } });
+      replaceNote(data.note);
+      toast(data.message, 'success');
+    } catch (err) {
+      replaceNote(note);
+      handleAuthError(err);
+    }
+  }
+
+  async function handleDuplicate(note) {
+    try {
+      const data = await api(`/notes/${note.id}/duplicate`, { method: 'POST' });
+      setNotes((list) => [...list, data.note]);
+      loadFolders().catch(() => {});
+      toast(data.message, 'success');
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  async function handleToggleCheck(note, itemId, done) {
+    replaceNote({ ...note, checklist: note.checklist.map((i) => (i.id === itemId ? { ...i, done } : i)) });
+    try {
+      const data = await api(`/notes/${note.id}/checklist/${itemId}`, { method: 'PATCH', body: { done } });
+      replaceNote(data.note);
+      const all = data.note.checklist.length > 1 && data.note.checklist.every((i) => i.done);
+      if (done && all) toast(`Checklist de "${note.title}" completa! 🎉`, 'success');
+    } catch (err) {
+      replaceNote(note);
+      handleAuthError(err);
+    }
+  }
+
+  async function handleResize(id, size) {
+    try {
+      replaceNote((await api(`/notes/${id}/size`, { method: 'PATCH', body: size })).note);
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  // ----- seleção múltipla -----
+  function toggleSelect(id) {
+    setSelection((sel) => {
+      const next = new Set(sel ?? []);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function runBatch(action, extra = {}) {
+    const ids = [...(selection ?? [])];
+    if (!ids.length) return;
+    try {
+      const data = await api('/notes/batch', { method: 'POST', body: { ids, action, ...extra } });
+      setSelection(null);
+      if (action === 'pin') {
+        refreshAll();
+        toast(data.message, 'success');
+        return;
+      }
+      dropFromBoard(data.ids);
+      loadFolders().catch(() => {});
+      if (action === 'move') toast(data.message, 'success');
+      else
+        offerUndo(data.message, async () => {
+          try {
+            for (const id of data.ids) {
+              if (action === 'delete') await api(`/notes/${id}/restore`, { method: 'POST' });
+              else await api(`/notes/${id}/archive`, { method: 'POST', body: { archived: false } });
+            }
+            refreshAll();
+          } catch (err) {
+            handleAuthError(err);
+          }
+        });
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  // ----- arrumar mural -----
+  async function handleArrange() {
+    const usable = (window.innerWidth / zoom) - 80;
+    const widest = Math.max(230, ...notes.map((n) => n.width ?? 230)) + 30;
+    const columns = Math.max(1, Math.min(8, Math.floor(usable / widest)));
+    setArranging(true);
+    try {
+      const data = await api('/notes/arrange', { method: 'POST', body: { folderId: currentFolder, columns } });
+      setNotes(data.notes);
+      boardRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+      toast(data.message, 'success');
+    } catch (err) {
+      handleAuthError(err);
+    } finally {
+      setTimeout(() => setArranging(false), 900);
+    }
+  }
+
+  // Esc sai do modo seleção
+  useEffect(() => {
+    if (selection === null) return;
+    const onKey = (e) => e.key === 'Escape' && setSelection(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selection]);
+
+  // Ctrl + rodinha do mouse = zoom (só no mural livre)
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || window.innerWidth <= 720) return;
+      e.preventDefault();
+      setZoomState((z) => {
+        const value = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - Math.sign(e.deltaY) * 0.1)) * 10) / 10;
+        try {
+          localStorage.setItem(ZOOM_KEY, String(value));
+        } catch {}
+        return value;
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   async function handleMove(id, pos) {
     try {
@@ -372,19 +635,6 @@ export default function BoardPage() {
       const maxZ = Math.max(0, ...list.map((n) => n.z));
       return list.map((n) => (n.id === id ? { ...n, z: maxZ + 1 } : n));
     });
-  }
-
-  async function handleDelete(id) {
-    try {
-      const data = await api(`/notes/${id}`, { method: 'DELETE' });
-      setNotes((list) => list.filter((n) => n.id !== id));
-      setAlerts((list) => list.filter((n) => n.id !== id));
-      setUpcoming((list) => list.filter((n) => n.id !== id));
-      loadFolders().catch(() => {});
-      toast(data.message, 'info');
-    } catch (err) {
-      handleAuthError(err);
-    }
   }
 
   async function handleDismiss(id) {
@@ -467,13 +717,27 @@ export default function BoardPage() {
   const openEdit = (note) => setModal({ open: true, note });
   const closeModal = useCallback(() => setModal((m) => ({ ...m, open: false })), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeSpecial = useCallback(() => setSpecialPanel(null), []);
 
   // No celular, por padrão, os post-its viram uma grade que cabe na tela (sem rolar para o lado)
   const gridMode = isMobile && settings.mobileLayout !== 'free';
-  const shownNotes = gridMode ? [...notes].sort(readingOrder) : notes;
-  const canvasW = Math.max(0, ...notes.map((n) => n.x + 320));
-  const canvasH = Math.max(0, ...notes.map((n) => n.y + 320));
-  const canvasStyle = gridMode ? undefined : { width: `max(100%, ${canvasW}px)`, height: `max(100%, ${canvasH}px)` };
+  const z = gridMode ? 1 : zoom;
+  // filtro por etiqueta (clicando numa #etiqueta do post-it)
+  const visibleNotes = tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes;
+  const shownNotes = gridMode ? [...visibleNotes].sort(readingOrder) : visibleNotes;
+  const canvasW = Math.max(0, ...notes.map((n) => n.x + (n.width ?? 230) + 90));
+  const canvasH = Math.max(0, ...notes.map((n) => n.y + (n.height ?? 300) + 90));
+  // O mural "de fora" tem o tamanho já com zoom (para a rolagem funcionar);
+  // por dentro os post-its continuam nas coordenadas reais e o conjunto é escalado
+  const canvasStyle = gridMode ? undefined : { width: `max(100%, ${canvasW * z}px)`, height: `max(100%, ${canvasH * z}px)` };
+  const zoomStyle = gridMode
+    ? undefined
+    : {
+        width: `max(${100 / z}%, ${canvasW}px)`,
+        height: `max(${100 / z}%, ${canvasH}px)`,
+        transform: z === 1 ? undefined : `scale(${z})`,
+      };
+  const selecting = selection !== null;
 
   const scene = resolveScene(settings, weather);
   const isDay = weather?.isDay ?? true;
@@ -512,6 +776,9 @@ export default function BoardPage() {
             onCreate={handleCreateFolder}
             onRename={handleRenameFolder}
             onDelete={handleDeleteFolder}
+            archivedCount={special.archived}
+            trashCount={special.trash}
+            onOpenSpecial={setSpecialPanel}
           />
         )}
         <motion.button
@@ -570,24 +837,82 @@ export default function BoardPage() {
           exit={{ opacity: 0, x: -40 }}
           transition={{ duration: 0.25 }}
         >
-          <AnimatePresence>
-            {shownNotes.map((note, i) => (
-              <PostIt
-                key={note.id}
-                note={note}
-                grid={gridMode}
-                index={i}
-                calm={calm}
-                found={foundId === note.id}
-                onMove={handleMove}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                onFocus={handleFocus}
-              />
-            ))}
-          </AnimatePresence>
+          <div className={gridMode ? 'canvas-inner-grid' : 'canvas-zoom'} style={zoomStyle}>
+            <AnimatePresence>
+              {shownNotes.map((note, i) => (
+                <PostIt
+                  key={note.id}
+                  note={note}
+                  grid={gridMode}
+                  index={i}
+                  zoom={z}
+                  calm={calm}
+                  found={foundId === note.id}
+                  selecting={selecting}
+                  selected={selection?.has(note.id) ?? false}
+                  arranging={arranging}
+                  onMove={handleMove}
+                  onResize={handleResize}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  onFocus={handleFocus}
+                  onPin={handlePin}
+                  onArchive={handleArchive}
+                  onDuplicate={handleDuplicate}
+                  onToggleCheck={handleToggleCheck}
+                  onTagClick={(t) => setTagFilter((cur) => (cur === t ? null : t))}
+                  onSelect={toggleSelect}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         </motion.div>
       </AnimatePresence>
+
+      {/* Filtro ativo por etiqueta */}
+      <AnimatePresence>
+        {tagFilter && (
+          <motion.div
+            className="tag-filter-pill"
+            initial={{ opacity: 0, y: -10, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -10, x: '-50%' }}
+          >
+            🏷️ Mostrando <b style={{ background: tagColor(tagFilter) }}>#{tagFilter}</b>
+            <span>
+              {visibleNotes.length} de {notes.length}
+            </span>
+            <button type="button" onClick={() => setTagFilter(null)} aria-label="Tirar filtro">
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {user && notes.length > 0 && (
+        <BoardTools
+          zoom={zoom}
+          onZoom={setZoom}
+          onArrange={handleArrange}
+          arranging={arranging}
+          selecting={selecting}
+          onSelectMode={() => setSelection((s) => (s === null ? new Set() : null))}
+          showFreeTools={!gridMode}
+        />
+      )}
+
+      <SelectionBar
+        count={selecting ? selection.size : null}
+        total={visibleNotes.length}
+        folders={folders}
+        currentFolder={currentFolder ?? null}
+        onSelectAll={() => setSelection(new Set(visibleNotes.map((n) => n.id)))}
+        onMove={(folderId) => runBatch('move', { folderId })}
+        onPin={() => runBatch('pin')}
+        onArchive={() => runBatch('archive')}
+        onDelete={() => runBatch('delete')}
+        onCancel={() => setSelection(null)}
+      />
 
       <AnimatePresence>
         {user && notesLoaded && notes.length === 0 && currentFolder !== null && (
@@ -688,6 +1013,14 @@ export default function BoardPage() {
         onSave={handleSave}
       />
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} onPick={handlePick} />
+      <TrashPanel
+        mode={specialPanel}
+        onClose={closeSpecial}
+        folders={folders}
+        onChanged={refreshAll}
+        toast={toast}
+        onAuthError={handleAuthError}
+      />
       <SettingsPanel
         open={settingsOpen}
         onClose={closeSettings}

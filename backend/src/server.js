@@ -4,6 +4,7 @@ import cors from 'cors';
 import { router } from './routes/index.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
 import './config/db.js';
+import { NoteModel } from './models/noteModel.js';
 
 // IPs desta máquina na rede local (Wi-Fi/cabo)
 function lanIPs() {
@@ -29,7 +30,14 @@ app.use(
     origin: (origin, done) => done(null, !origin || allowed.includes(origin) || LAN_FRONT.test(origin)),
   }),
 );
-app.use(express.json({ limit: '100kb' }));
+// Corpo pequeno para tudo, exceto o envio de foto (imagem já reduzida pelo front, em base64)
+const smallJson = express.json({ limit: '100kb' });
+const imageJson = express.json({ limit: '2.5mb' });
+app.use((req, res, next) => (/\/notes\/\d+\/image$/.test(req.path) ? imageJson : smallJson)(req, res, next));
+
+// Limpa a lixeira antiga ao iniciar e uma vez por dia
+NoteModel.purgeOldTrash();
+setInterval(() => NoteModel.purgeOldTrash(), 24 * 60 * 60 * 1000).unref();
 
 app.use('/api', router);
 app.use(notFound);

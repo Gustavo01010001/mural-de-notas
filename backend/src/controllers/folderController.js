@@ -1,4 +1,5 @@
 import { FolderModel } from '../models/folderModel.js';
+import { NoteModel } from '../models/noteModel.js';
 import { HttpError } from '../utils/httpError.js';
 import { parseId, validateFolder } from '../utils/validators.js';
 
@@ -9,7 +10,13 @@ function ensureUniqueName(userId, name, exceptId = null) {
 
 export const FolderController = {
   list(req, res) {
-    res.json({ folders: FolderModel.listByUser(req.user.id), rootCount: FolderModel.countRoot(req.user.id) });
+    const special = NoteModel.countSpecial(req.user.id);
+    res.json({
+      folders: FolderModel.listByUser(req.user.id),
+      rootCount: FolderModel.countRoot(req.user.id),
+      archivedCount: special.archived ?? 0,
+      trashCount: special.trash ?? 0,
+    });
   },
 
   create(req, res) {

@@ -382,6 +382,211 @@ describe('Configurações e perfil', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('Lixeira e desfazer', () => {
+  let token;
+  before(async () => ({ token } = await newUser()));
+
+  test('excluir manda para a lixeira; desfazer restaura; apagar de vez some', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'Ideia preciosa', eventDate: today(), eventType: 'event' } })).data.note;
+    assert.equal((await call(`/notes/${n.id}`, { method: 'DELETE', token })).status, 200);
+
+    // some do mural, dos alertas e da busca, mas aparece na lixeira
+    assert.ok(!(await call('/notes', { token })).data.notes.some((x) => x.id === n.id));
+    assert.ok(!(await call('/alerts', { token })).data.alerts.some((x) => x.id === n.id));
+    assert.equal((await call('/notes/search?q=preciosa', { token })).data.results.length, 0);
+    const trash = await call('/notes/trash', { token });
+    assert.equal(trash.data.days, 30);
+    assert.equal(trash.data.notes[0].status, 'trash');
+    assert.equal((await call('/folders', { token })).data.trashCount, 1);
+
+    // na lixeira não dá para editar
+    assert.equal((await call(`/notes/${n.id}`, { method: 'PUT', token, body: { title: 'x' } })).status, 404);
+
+    // desfazer
+    const r = await call(`/notes/${n.id}/restore`, { method: 'POST', token });
+    assert.equal(r.data.note.status, 'active');
+    assert.ok((await call('/notes', { token })).data.notes.some((x) => x.id === n.id));
+
+    // apagar de vez só funciona para quem está na lixeira
+    assert.equal((await call(`/notes/${n.id}/permanent`, { method: 'DELETE', token })).status, 404);
+    await call(`/notes/${n.id}`, { method: 'DELETE', token });
+    assert.equal((await call(`/notes/${n.id}/permanent`, { method: 'DELETE', token })).status, 200);
+    assert.equal((await call('/notes/trash', { token })).data.notes.length, 0);
+  });
+
+  test('esvaziar lixeira', async () => {
+    for (const title of ['a', 'b']) {
+      const n = (await call('/notes', { method: 'POST', token, body: { title } })).data.note;
+      await call(`/notes/${n.id}`, { method: 'DELETE', token });
+    }
+    const r = await call('/notes/trash', { method: 'DELETE', token });
+    assert.match(r.data.message, /2 post-its/);
+    assert.equal((await call('/notes/trash', { token })).data.notes.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Fixar, arquivar, duplicar, checklist e etiquetas', () => {
+  let token;
+  before(async () => ({ token } = await newUser()));
+
+  test('fixar e arquivar', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'Importante' } })).data.note;
+    assert.equal((await call(`/notes/${n.id}/pin`, { method: 'POST', token, body: { pinned: true } })).data.note.pinned, true);
+
+    await call(`/notes/${n.id}/archive`, { method: 'POST', token, body: { archived: true } });
+    assert.ok(!(await call('/notes', { token })).data.notes.some((x) => x.id === n.id));
+    const arch = await call('/notes/archived', { token });
+    assert.equal(arch.data.notes[0].id, n.id);
+    assert.equal((await call('/folders', { token })).data.archivedCount, 1);
+    // arquivados continuam aparecendo na busca
+    assert.equal((await call('/notes/search?q=importante', { token })).data.results[0].status, 'archived');
+
+    await call(`/notes/${n.id}/archive`, { method: 'POST', token, body: { archived: false } });
+    assert.ok((await call('/notes', { token })).data.notes.some((x) => x.id === n.id));
+  });
+
+  test('checklist: salvar, marcar item e validar', async () => {
+    const n = (
+      await call('/notes', {
+        method: 'POST',
+        token,
+        body: { title: 'Mercado', checklist: [{ text: 'Pão' }, { text: 'Café', done: true }, { text: '   ' }] },
+      })
+    ).data.note;
+    assert.equal(n.checklist.length, 2); // item vazio é descartado
+    assert.equal(n.checklist[1].done, true);
+
+    const item = n.checklist[0];
+    const r = await call(`/notes/${n.id}/checklist/${item.id}`, { method: 'PATCH', token, body: { done: true } });
+    assert.ok(r.data.note.checklist.every((i) => i.done));
+    assert.equal((await call(`/notes/${n.id}/checklist/nao-existe`, { method: 'PATCH', token, body: { done: true } })).status, 404);
+
+    const big = Array.from({ length: 31 }, (_, i) => ({ text: `item ${i}` }));
+    assert.equal((await call('/notes', { method: 'POST', token, body: { title: 'x', checklist: big } })).status, 400);
+    assert.equal((await call('/notes', { method: 'POST', token, body: { title: 'x', checklist: 'pão' } })).status, 400);
+  });
+
+  test('etiquetas: normaliza, valida e busca por #etiqueta', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'Bug no login', tags: ['#Urgente', 'trabalho', 'urgente', ' Front End '] } })).data.note;
+    assert.deepEqual(n.tags, ['urgente', 'trabalho', 'front-end']);
+    for (const tags of [['<script>'], ['x'.repeat(21)], ['a', 'b', 'c', 'd', 'e', 'f', 'g']]) {
+      assert.equal((await call('/notes', { method: 'POST', token, body: { title: 'x', tags } })).status, 400, JSON.stringify(tags));
+    }
+    await call('/notes', { method: 'POST', token, body: { title: 'Outro', tags: ['ideia'] } });
+    const r = await call(`/notes/search?q=${encodeURIComponent('#urgente')}`, { token });
+    assert.deepEqual(r.data.results.map((x) => x.title), ['Bug no login']);
+  });
+
+  test('duplicar copia tudo (menos o fixado) e desloca um pouco', async () => {
+    const src = (await call('/notes', { method: 'POST', token, body: { title: 'Modelo', content: 'texto', checklist: [{ text: 'a' }], tags: ['ideia'], x: 100, y: 100 } })).data.note;
+    await call(`/notes/${src.id}/pin`, { method: 'POST', token, body: { pinned: true } });
+    const copy = (await call(`/notes/${src.id}/duplicate`, { method: 'POST', token })).data.note;
+    assert.notEqual(copy.id, src.id);
+    assert.equal(copy.title, 'Modelo');
+    assert.deepEqual(copy.tags, ['ideia']);
+    assert.equal(copy.checklist[0].text, 'a');
+    assert.equal(copy.pinned, false);
+    assert.equal(copy.x, 130);
+  });
+
+  test('tamanho tem limites', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'Grande' } })).data.note;
+    const r = await call(`/notes/${n.id}/size`, { method: 'PATCH', token, body: { width: 9999, height: 10 } });
+    assert.equal(r.data.note.width, 520);
+    assert.equal(r.data.note.height, 140);
+    assert.equal((await call(`/notes/${n.id}/size`, { method: 'PATCH', token, body: { width: 'a', height: 1 } })).status, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Ações em lote e arrumar mural', () => {
+  let token;
+  before(async () => ({ token } = await newUser()));
+
+  test('mover, arquivar e excluir vários de uma vez', async () => {
+    const folder = (await call('/folders', { method: 'POST', token, body: { name: 'Destino' } })).data.folder;
+    const ids = [];
+    for (let i = 0; i < 4; i++) ids.push((await call('/notes', { method: 'POST', token, body: { title: `n${i}` } })).data.note.id);
+
+    const mv = await call('/notes/batch', { method: 'POST', token, body: { ids: ids.slice(0, 2), action: 'move', folderId: folder.id } });
+    assert.match(mv.data.message, /2 post-its movidos para "Destino"/);
+    assert.equal((await call(`/notes?folder=${folder.id}`, { token })).data.notes.length, 2);
+
+    await call('/notes/batch', { method: 'POST', token, body: { ids: [ids[2]], action: 'archive' } });
+    await call('/notes/batch', { method: 'POST', token, body: { ids: [ids[3]], action: 'delete' } });
+    const f = (await call('/folders', { token })).data;
+    assert.equal(f.archivedCount, 1);
+    assert.equal(f.trashCount, 1);
+
+    assert.equal((await call('/notes/batch', { method: 'POST', token, body: { ids: [], action: 'delete' } })).status, 400);
+    assert.equal((await call('/notes/batch', { method: 'POST', token, body: { ids: [ids[0]], action: 'explodir' } })).status, 400);
+  });
+
+  test('arrumar mural organiza em grade, fixados primeiro', async () => {
+    const f = (await call('/folders', { method: 'POST', token, body: { name: 'Bagunça' } })).data.folder;
+    const created = [];
+    for (const [title, x, y] of [['c', 900, 700], ['a', 10, 10], ['b', 500, 20]]) {
+      created.push((await call('/notes', { method: 'POST', token, body: { title, x, y, folderId: f.id } })).data.note);
+    }
+    await call(`/notes/${created[0].id}/pin`, { method: 'POST', token, body: { pinned: true } });
+    const r = await call('/notes/arrange', { method: 'POST', token, body: { folderId: f.id, columns: 2 } });
+    const byTitle = Object.fromEntries(r.data.notes.map((n) => [n.title, n]));
+    assert.deepEqual([byTitle.c.x, byTitle.c.y], [40, 120]); // fixado vai para o 1º lugar
+    assert.equal(byTitle.a.y, 120); // mesma linha
+    assert.ok(byTitle.a.x > byTitle.c.x);
+    assert.ok(byTitle.b.y > 120); // segunda linha
+  });
+
+  test('outro usuário não consegue usar lote nos meus post-its', async () => {
+    const mine = (await call('/notes', { method: 'POST', token, body: { title: 'meu' } })).data.note;
+    const other = await newUser();
+    const r = await call('/notes/batch', { method: 'POST', token: other.token, body: { ids: [mine.id], action: 'delete' } });
+    assert.match(r.data.message, /^0 post-its/);
+    assert.ok((await call('/notes', { token })).data.notes.some((n) => n.id === mine.id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Foto do post-it', () => {
+  // PNG de 1x1 pixel
+  const PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  let token;
+  before(async () => ({ token } = await newUser()));
+
+  test('enviar, ler, duplicar com foto e remover', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'Receita' } })).data.note;
+    const up = await call(`/notes/${n.id}/image`, { method: 'PUT', token, body: { dataUrl: PNG } });
+    assert.equal(up.status, 200);
+    assert.equal(up.data.note.hasImage, true);
+
+    const res = await fetch(`${BASE}/notes/${n.id}/image`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(res.headers.get('cache-control'), 'no-store'); // navegador não guarda a foto
+    assert.equal((await fetch(`${BASE}/notes/${n.id}/image`)).status, 401); // sem login não vê
+    assert.equal((await res.arrayBuffer()).byteLength > 50, true);
+
+    const copy = (await call(`/notes/${n.id}/duplicate`, { method: 'POST', token })).data.note;
+    assert.equal(copy.hasImage, true);
+
+    await call(`/notes/${n.id}/image`, { method: 'DELETE', token });
+    assert.equal((await call(`/notes/${n.id}/image`, { token })).status, 404);
+  });
+
+  test('recusa arquivo que não é imagem e foto de outro usuário', async () => {
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'X' } })).data.note;
+    const fake = 'data:image/png;base64,' + Buffer.from('isso não é uma imagem').toString('base64');
+    assert.equal((await call(`/notes/${n.id}/image`, { method: 'PUT', token, body: { dataUrl: fake } })).status, 400);
+    assert.equal((await call(`/notes/${n.id}/image`, { method: 'PUT', token, body: { dataUrl: 'data:text/html;base64,PGI+' } })).status, 400);
+
+    await call(`/notes/${n.id}/image`, { method: 'PUT', token, body: { dataUrl: PNG } });
+    const other = await newUser();
+    assert.equal((await call(`/notes/${n.id}/image`, { token: other.token })).status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('Robustez e segurança básica', () => {
   test('rota inexistente e JSON quebrado respondem com erro amigável', async () => {
     const nf = await call('/nao-existe');

@@ -4,7 +4,7 @@
 // Uso:  npm run seed -- <email> <senha>
 //       (entra na conta, ou cria se ela ainda não existir)
 
-const API = process.env.API_URL || 'http://localhost:4000/api';
+const API = process.env.API_URL || 'http://127.0.0.1:4000/api';
 const [email, password] = process.argv.slice(2);
 const TZ = 'America/Sao_Paulo';
 

@@ -4,7 +4,10 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const dataDir = path.resolve(import.meta.dirname, '..', '..', 'data');
+// DB_DIR permite usar outro banco (ex.: os testes automáticos usam uma pasta temporária)
+const dataDir = process.env.DB_DIR
+  ? path.resolve(process.env.DB_DIR)
+  : path.resolve(import.meta.dirname, '..', '..', 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 export const db = new DatabaseSync(path.join(dataDir, 'notas.db'));

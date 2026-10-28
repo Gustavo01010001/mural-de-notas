@@ -45,6 +45,11 @@ npm run dev
 
 Acesse **http://localhost:3000**, crie sua conta em *Cadastre-se* e comece a colar post-its.
 
+## 🧪 Testes
+
+- `npm test` na pasta `backend`: 25 testes automáticos da API (usam um banco temporário).
+- Relatório completo dos testes de PC e celular: [TESTES.md](TESTES.md).
+
 ## 📱 Testar no celular com HTTPS (mesma rede Wi-Fi)
 
 O navegador só libera **localização** (clima da sua cidade) e **notificações** em HTTPS.

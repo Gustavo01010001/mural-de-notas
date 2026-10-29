@@ -142,3 +142,23 @@ exportar/importar backup, excluir e restaurar conta, backup do banco, validaçã
 - No celular o timer de foco saía pela direita e cobria o zoom.
 
 **Não testado:** impressão real do PDF, exclusão de conta pela tela (testada pela API), e-mail e Google (sem tela).
+
+## Rodada 4b — Menos poluição visual (avaliação heurística de IHC)
+
+Avaliação feita com as **10 heurísticas de Nielsen** e os **princípios de design** (visibilidade,
+consistência, feedback, affordance) das aulas de IHC. Problemas encontrados e o que foi feito:
+
+| Problema (antes) | Heurística | Solução |
+|---|---|---|
+| Timer de foco ficava **por cima** do botão "Selecionar" no PC | 8 · Projeto minimalista / 4 · Consistência | O timer agora entra **na mesma barra** do zoom, ao lado — nunca sobrepõe |
+| Barra de baixo com zoom + Arrumar + Foco + Selecionar (4 itens) | 8 · Projeto minimalista | À vista só o zoom (PC); o resto foi para **"⋯ Mais"**, cada opção com nome e explicação curta (6 · Reconhecer em vez de lembrar) |
+| No celular, 4 camadas empilhadas embaixo (timer, zoom, datas, +) | 8 | Uma linha só: **[Próximas datas] [⋯] [+]**; o timer, se ligado, fica numa faixa logo acima; zoom vai para dentro do "Mais" |
+| Cada post-it mostrava ✏️ 📌 ⋯ o tempo todo no celular | 8 | No toque fica só o **⋯**; "Editar" e "Fixar" estão dentro do menu (no PC continuam aparecendo ao passar o mouse) |
+| "Faltam 2 dias" encavalava com o horário no post-it | 8 / legibilidade | A etiqueta desce de linha quando falta espaço |
+| Timer com 4 botões (▶ ↺ – ✕) | 8 | "Minimizar" saiu (fazia o mesmo que fechar, o tempo fica guardado); "↺" só aparece depois que o tempo começou |
+| Botão "N" do Next cobrindo "Próximas datas" | 8 | Desligado (`devIndicators: false`) — só existia em desenvolvimento |
+| Alto contraste: borda dupla e torta no seletor "Mural geral" | 4 · Consistência | Borda só no botão, igual aos outros |
+
+**Verificado no navegador:** PC (1366×768) e celular (375×812, toque): nenhum elemento fixo
+se sobrepõe a outro (conferido por script com as caixas de cada elemento), sem rolagem lateral,
+menu "Mais" com 3 opções escritas, menu do post-it com Editar/Fixar no celular. `next build` ok.

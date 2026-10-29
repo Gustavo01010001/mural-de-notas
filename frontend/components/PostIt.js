@@ -227,12 +227,12 @@ export default function PostIt({
 
       {!selecting && (
         <div className={`postit-actions ${menuOpen ? 'open' : ''}`}>
-          <button type="button" onClick={() => onEdit(note)} aria-label="Editar">
+          <button type="button" className="hover-only" onClick={() => onEdit(note)} aria-label="Editar">
             ✏️
           </button>
           <button
             type="button"
-            className={note.pinned ? 'active' : ''}
+            className={`hover-only ${note.pinned ? 'active' : ''}`}
             onClick={() => onPin(note)}
             aria-label={note.pinned ? 'Desafixar' : 'Fixar no topo'}
             title={note.pinned ? 'Desafixar' : 'Fixar no topo'}
@@ -253,6 +253,9 @@ export default function PostIt({
                   transition={{ duration: 0.15 }}
                 >
                   {[
+                    // no toque não há "passar o mouse": editar e fixar moram aqui
+                    ['✏️', 'Editar', () => onEdit(note), 'touch-only'],
+                    ['📌', note.pinned ? 'Desafixar' : 'Fixar no topo', () => onPin(note), 'touch-only'],
                     ['📄', 'Duplicar', () => onDuplicate(note)],
                     ['📁', 'Mover para pasta…', () => onSelect(note.id)],
                     ...(note.eventDate

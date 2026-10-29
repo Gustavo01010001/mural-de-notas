@@ -14,6 +14,8 @@ const nextConfig = {
   reactStrictMode: true,
   turbopack: { root: import.meta.dirname },
   allowedDevOrigins: lanIPs,
+  // Sem o botãozinho "N" do Next no canto: só aparecia em desenvolvimento e cobria "Próximas datas"
+  devIndicators: false,
   // O navegador fala só com o front (http ou https, mesmo endereço);
   // o Next repassa /api/* para o backend. Assim o celular aceita um único certificado.
   async rewrites() {

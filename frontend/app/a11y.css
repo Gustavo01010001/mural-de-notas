@@ -164,21 +164,18 @@ html.hc .stars {
 /* =====================================================================
    Timer de foco (Pomodoro) — discreto, embaixo
    ===================================================================== */
+/* fica dentro da barra de baixo (.board-tools), ao lado do zoom: nunca por cima de outro botão */
 .focus-timer {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  z-index: 10002;
-  transform: translateX(-50%);
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 12px 10px 16px;
-  border-radius: 18px;
+  gap: 10px;
+  height: 42px;
+  padding: 0 6px 0 8px;
+  border-radius: 12px;
   background: rgba(18, 18, 26, 0.92);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(16px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 
@@ -213,7 +210,7 @@ html.hc .stars {
 }
 
 .focus-time {
-  font-size: 1.9rem;
+  font-size: 1.35rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -228,19 +225,21 @@ html.hc .stars {
   gap: 4px;
 }
 
-.focus-actions button,
-.focus-mini {
-  min-width: 34px;
-  height: 34px;
+.focus-actions button {
+  min-width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: transparent;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
-html.theme-light .focus-actions button,
-html.theme-light .focus-mini {
+.focus-actions button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.theme-light .focus-actions button:hover {
   background: rgba(0, 0, 0, 0.06);
 }
 
@@ -249,14 +248,105 @@ html.theme-light .focus-mini {
   color: #1a1a1a;
 }
 
-.focus-timer.mini {
-  padding: 6px;
+/* =====================================================================
+   Menos poluição visual (IHC — heurística 8 de Nielsen: projeto minimalista)
+   ===================================================================== */
+.board-tools {
+  align-items: center;
 }
 
-.focus-mini {
-  padding: 0 12px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
+.tools-menu {
+  position: relative;
+}
+
+.tools-menu-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 260px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 14px;
+  background: rgba(22, 22, 30, 0.97);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+
+html.theme-light .tools-menu-list {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 44px rgba(60, 40, 0, 0.18);
+}
+
+.tools-menu-list > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.tools-menu-list > button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.theme-light .tools-menu-list > button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tools-menu-list > button:disabled {
+  opacity: 0.5;
+}
+
+.tm-icon {
+  width: 22px;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.tm-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-text small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+/* o zoom aparece fora do menu no PC e dentro dele no celular */
+.zoom-inside {
+  display: none;
+}
+
+/* hover-only: botões que só fazem sentido com mouse; touch-only: o contrário */
+.postit-menu-list button.touch-only {
+  display: none;
+}
+
+@media (hover: none) {
+  .postit-actions .hover-only {
+    display: none;
+  }
+
+  .postit-menu-list button.touch-only {
+    display: flex;
+  }
+}
+
+/* data e "Faltam X dias" não se encavalam: a etiqueta desce se faltar espaço */
+.postit-event {
+  flex-wrap: wrap;
+}
+
+.postit-badge {
+  margin-left: auto;
 }
 
 /* =====================================================================
@@ -490,24 +580,45 @@ html.theme-light .account-warn {
 
 /* ----- celular ----- */
 @media (max-width: 720px) {
-  /* no celular ocupa a largura toda, acima das ferramentas do mural */
+  /* celular: uma linha só embaixo → [Próximas datas] [⋯] [+]; o timer fica numa faixa logo acima */
+  .board-tools {
+    right: 88px !important;
+    bottom: calc(25px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .zoom-outside {
+    display: none !important;
+  }
+
+  .zoom-inside {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .tools-menu-list {
+    width: min(270px, calc(100vw - 110px));
+  }
+
+  .upcoming {
+    right: 146px !important;
+  }
+
+  .upcoming.collapsed h4 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .focus-timer {
+    position: fixed;
     left: 12px;
     right: 12px;
-    bottom: calc(146px + env(safe-area-inset-bottom));
-    transform: none !important;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    height: 48px;
     justify-content: space-between;
-    gap: 8px;
-    padding: 8px 8px 8px 12px;
-  }
-
-  .focus-timer.mini {
-    left: auto;
-  }
-
-  .focus-actions button {
-    min-width: 32px;
-    height: 32px;
+    padding: 0 8px 0 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   }
 
   .focus-time {

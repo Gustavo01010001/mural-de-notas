@@ -1074,7 +1074,7 @@ export default function BoardPage() {
         )}
       </AnimatePresence>
 
-      {user && notes.length > 0 && (
+      {user && (
         <BoardTools
           zoom={zoom}
           onZoom={setZoom}
@@ -1083,9 +1083,21 @@ export default function BoardPage() {
           selecting={selecting}
           onSelectMode={() => setSelection((s) => (s === null ? new Set() : null))}
           showFreeTools={!gridMode}
+          hasNotes={notes.length > 0}
           focusOn={settings.showFocusTimer}
           onFocusTimer={() => handleSettingsChange({ showFocusTimer: !settings.showFocusTimer })}
-        />
+        >
+          {settings.showFocusTimer && (
+            <FocusTimer
+              key="focus"
+              focusMinutes={settings.focusMinutes}
+              breakMinutes={settings.breakMinutes}
+              calm={calm}
+              toast={toast}
+              onClose={() => handleSettingsChange({ showFocusTimer: false })}
+            />
+          )}
+        </BoardTools>
       )}
 
       <SelectionBar
@@ -1259,18 +1271,6 @@ export default function BoardPage() {
           router.replace('/login');
         }}
       />
-      <AnimatePresence>
-        {user && settings.showFocusTimer && (
-          <FocusTimer
-            key="focus"
-            focusMinutes={settings.focusMinutes}
-            breakMinutes={settings.breakMinutes}
-            calm={calm}
-            toast={toast}
-            onClose={() => handleSettingsChange({ showFocusTimer: false })}
-          />
-        )}
-      </AnimatePresence>
       <AlertModal alerts={alerts} onDismiss={handleDismiss} calm={calm} />
     </main>
   );

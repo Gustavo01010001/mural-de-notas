@@ -25,7 +25,6 @@ export default function FocusTimer({ focusMinutes = 25, breakMinutes = 5, onClos
   const breakMs = breakMinutes * 60_000;
   const [state, setState] = useState(() => (typeof window === 'undefined' ? null : load(focusMs)));
   const [now, setNow] = useState(Date.now());
-  const [mini, setMini] = useState(false);
   const titleRef = useRef(null);
 
   // salva a cada mudança
@@ -89,59 +88,50 @@ export default function FocusTimer({ focusMinutes = 25, breakMinutes = 5, onClos
 
   return (
     <motion.div
-      className={`focus-timer ${state.mode} ${mini ? 'mini' : ''}`}
-      initial={{ opacity: 0, y: 30 }}
+      className={`focus-timer ${state.mode}`}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 30 }}
-      layout
+      exit={{ opacity: 0, y: 20 }}
       role="timer"
       aria-label={`${state.mode === 'focus' ? 'Foco' : 'Pausa'}: ${fmt(left)}`}
     >
       <span className="focus-progress" style={{ transform: `scaleX(${progress})` }} />
-      {mini ? (
-        <button type="button" className="focus-mini" onClick={() => setMini(false)} title="Abrir o timer">
-          {state.mode === 'focus' ? '🎯' : '☕'} {fmt(left)}
+      <div className="focus-main">
+        <button type="button" className="focus-mode" onClick={switchMode} title="Trocar entre foco e pausa">
+          {state.mode === 'focus' ? '🎯 Foco' : '☕ Pausa'}
         </button>
-      ) : (
-        <>
-          <div className="focus-main">
-            <button type="button" className="focus-mode" onClick={switchMode} title="Trocar entre foco e pausa">
-              {state.mode === 'focus' ? '🎯 Foco' : '☕ Pausa'}
-            </button>
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span key={fmt(left).slice(0, 2)} className="focus-time" initial={calm ? false : { y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                {fmt(left)}
-              </motion.span>
-            </AnimatePresence>
-            {state.done > 0 && (
-              <span className="focus-count" title={`${state.done} ciclo(s) de foco hoje`}>
-                {'🍅'.repeat(Math.min(state.done, 4))}
-                {state.done > 4 ? ` +${state.done - 4}` : ''}
-              </span>
-            )}
-          </div>
-          <div className="focus-actions">
-            {state.running ? (
-              <button type="button" onClick={pause} aria-label="Pausar">
-                ⏸
-              </button>
-            ) : (
-              <button type="button" className="primary" onClick={start} aria-label="Começar">
-                ▶
-              </button>
-            )}
-            <button type="button" onClick={reset} aria-label="Recomeçar">
-              ↺
-            </button>
-            <button type="button" onClick={() => setMini(true)} aria-label="Minimizar">
-              –
-            </button>
-            <button type="button" onClick={onClose} aria-label="Fechar o timer">
-              ✕
-            </button>
-          </div>
-        </>
-      )}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span key={fmt(left).slice(0, 2)} className="focus-time" initial={calm ? false : { y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+            {fmt(left)}
+          </motion.span>
+        </AnimatePresence>
+        {state.done > 0 && (
+          <span className="focus-count" title={`${state.done} ciclo(s) de foco hoje`}>
+            {'🍅'.repeat(Math.min(state.done, 4))}
+            {state.done > 4 ? ` +${state.done - 4}` : ''}
+          </span>
+        )}
+      </div>
+      <div className="focus-actions">
+        {state.running ? (
+          <button type="button" onClick={pause} aria-label="Pausar">
+            ⏸
+          </button>
+        ) : (
+          <button type="button" className="primary" onClick={start} aria-label="Começar">
+            ▶
+          </button>
+        )}
+        {/* "recomeçar" só aparece quando já contou algum tempo (menos botões à toa) */}
+        {left < total - 1000 && (
+          <button type="button" onClick={reset} aria-label="Recomeçar" title="Recomeçar">
+            ↺
+          </button>
+        )}
+        <button type="button" onClick={onClose} aria-label="Esconder o timer" title="Esconder (o tempo continua guardado)">
+          ✕
+        </button>
+      </div>
     </motion.div>
   );
 }

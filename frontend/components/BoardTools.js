@@ -1,41 +1,96 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 1.6;
 
-// Ferramentas discretas do mural (canto de baixo): zoom, arrumar e selecionar
-export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, selecting, showFreeTools, focusOn, onFocusTimer }) {
+function ZoomControl({ zoom, onZoom, className = '' }) {
+  return (
+    <div className={`zoom-control ${className}`} role="group" aria-label="Zoom do mural">
+      <button type="button" onClick={() => onZoom(zoom - 0.1)} disabled={zoom <= ZOOM_MIN + 0.001} aria-label="Diminuir zoom">
+        −
+      </button>
+      <button type="button" className="zoom-value" onClick={() => onZoom(1)} title="Voltar para 100%">
+        {Math.round(zoom * 100)}%
+      </button>
+      <button type="button" onClick={() => onZoom(zoom + 0.1)} disabled={zoom >= ZOOM_MAX - 0.001} aria-label="Aumentar zoom">
+        +
+      </button>
+    </div>
+  );
+}
+
+// Barra de baixo do mural. Pensada com IHC (projeto minimalista): à vista fica só o que se usa sempre
+// (zoom no PC e o timer quando ligado); o resto vai para o menu "Mais", com nome escrito em cada opção.
+// O timer entra aqui dentro (children), então nunca fica por cima dos botões.
+export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, selecting, showFreeTools, hasNotes, focusOn, onFocusTimer, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+
+  const run = (fn) => () => {
+    setOpen(false);
+    fn();
+  };
+
+  const items = [
+    showFreeTools && hasNotes && { icon: '▦', label: arranging ? 'Arrumando…' : 'Arrumar em grade', hint: 'Organiza os post-its lado a lado', fn: onArrange, disabled: arranging },
+    hasNotes && { icon: '☑', label: selecting ? 'Cancelar seleção' : 'Selecionar vários', hint: 'Mover, arquivar ou excluir de uma vez', fn: onSelectMode },
+    { icon: '⏱', label: focusOn ? 'Esconder timer de foco' : 'Timer de foco', hint: 'Pomodoro: foco e pausa', fn: onFocusTimer },
+  ].filter(Boolean);
+
   return (
     <motion.div className="board-tools" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      {showFreeTools && (
-        <>
-          <div className="zoom-control" role="group" aria-label="Zoom do mural">
-            <button type="button" onClick={() => onZoom(zoom - 0.1)} disabled={zoom <= ZOOM_MIN + 0.001} aria-label="Diminuir zoom">
-              −
-            </button>
-            <button type="button" className="zoom-value" onClick={() => onZoom(1)} title="Voltar para 100%">
-              {Math.round(zoom * 100)}%
-            </button>
-            <button type="button" onClick={() => onZoom(zoom + 0.1)} disabled={zoom >= ZOOM_MAX - 0.001} aria-label="Aumentar zoom">
-              +
-            </button>
-          </div>
-          <button type="button" className="tool-btn" onClick={onArrange} disabled={arranging} title="Organizar os post-its em grade">
-            <motion.span animate={arranging ? { rotate: 360 } : { rotate: 0 }} transition={{ duration: 0.6 }}>
-              ▦
-            </motion.span>
-            <span className="tool-label">Arrumar</span>
-          </button>
-        </>
-      )}
-      <button type="button" className={`tool-btn ${focusOn ? 'active' : ''}`} onClick={onFocusTimer} title="Timer de foco (Pomodoro)" aria-pressed={focusOn}>
-        ⏱ <span className="tool-label">Foco</span>
-      </button>
-      <button type="button" className={`tool-btn ${selecting ? 'active' : ''}`} onClick={onSelectMode} title="Selecionar vários post-its">
-        ☑ <span className="tool-label">{selecting ? 'Cancelar' : 'Selecionar'}</span>
-      </button>
+      <AnimatePresence>{children}</AnimatePresence>
+      {showFreeTools && hasNotes && <ZoomControl zoom={zoom} onZoom={onZoom} className="zoom-outside" />}
+      <div className="tools-menu" ref={ref}>
+        <button
+          type="button"
+          className={`tool-btn ${open || selecting ? 'active' : ''}`}
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          title="Mais ferramentas"
+        >
+          ⋯ <span className="tool-label">Mais</span>
+        </button>
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="tools-menu-list"
+              role="menu"
+              initial={{ opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.15 }}
+            >
+              {showFreeTools && hasNotes && <ZoomControl zoom={zoom} onZoom={onZoom} className="zoom-inside" />}
+              {items.map((it) => (
+                <button key={it.icon} type="button" role="menuitem" onClick={run(it.fn)} disabled={it.disabled}>
+                  <span className="tm-icon">{it.icon}</span>
+                  <span className="tm-text">
+                    {it.label}
+                    <small>{it.hint}</small>
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 }

@@ -340,6 +340,48 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
   }
 }
 
+/* Botões do post-it (avaliação de usuário novo U2–U4): maiores, visíveis e sem cobrir o título */
+.postit-actions button {
+  min-width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (hover: hover) {
+  /* no PC os botões aparecem numa faixa acima do título, não por cima dele */
+  .postit,
+  .postit.in-grid {
+    padding-top: 40px;
+  }
+}
+
+@media (hover: none) {
+  /* no toque fica só o ⋯: o título deixa espaço para ele */
+  .postit-title {
+    padding-right: 36px;
+  }
+
+  .postit-menu > button {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.14);
+    color: rgba(0, 0, 0, 0.75);
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  /* área de toque de 46 px (mínimo recomendado: 44 px), sem aumentar o desenho */
+  .postit-menu > button::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+}
+
 /* data e "Faltam X dias" não se encavalam: a etiqueta desce se faltar espaço */
 .postit-event {
   flex-wrap: wrap;
@@ -481,6 +523,153 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
 
 html.theme-light .account-warn {
   color: #a0520a !important;
+}
+
+/* =====================================================================
+   Entrar / cadastro (avaliação de usuário novo I1, I5)
+   ===================================================================== */
+.auth-brand {
+  margin: -6px 0 0;
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.password-wrap {
+  position: relative;
+  display: flex;
+}
+
+.password-wrap input {
+  flex: 1;
+  padding-right: 50px !important;
+}
+
+.show-pass {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 44px;
+  height: 40px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.show-pass:hover,
+.show-pass[aria-pressed='true'] {
+  color: var(--text);
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.field-hint.warn {
+  color: #ffc078;
+}
+
+html.theme-light .field-hint.warn {
+  color: #a0520a;
+}
+
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.auth-or::before,
+.auth-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--glass-border);
+}
+
+.btn-secondary {
+  display: block;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 216, 77, 0.08);
+}
+
+/* =====================================================================
+   Formulário do post-it (I2, I4): básico à vista, erro ao lado do campo
+   ===================================================================== */
+/* rótulo só para leitor de tela (o campo já mostra o exemplo visualmente) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.note-title-input.invalid {
+  border-color: #c92a2a !important;
+  box-shadow: 0 0 0 3px rgba(201, 42, 42, 0.25) !important;
+}
+
+.field-error {
+  display: block;
+  margin: -4px 0 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(201, 42, 42, 0.12);
+  color: #8a1c1c;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.add-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.add-extras > span {
+  font-weight: 600;
+}
+
+.extra-chip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.45);
+  color: #2b2b2b;
+  font-size: 0.85rem;
+}
+
+.extra-chip:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-style: solid;
 }
 
 /* =====================================================================

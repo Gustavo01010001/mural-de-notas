@@ -50,10 +50,16 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
   const [preview, setPreview] = useState(null);
   const [imageError, setImageError] = useState('');
   const fileRef = useRef(null);
+  const titleRef = useRef(null);
+  const [error, setError] = useState('');
+  const [extras, setExtras] = useState({});
 
   useEffect(() => {
     if (!open) return;
-    setForm(fromNote(note, defaultColor, currentFolder));
+    const f = fromNote(note, defaultColor, currentFolder);
+    setForm(f);
+    setError('');
+    setExtras({ checklist: f.checklist.length > 0, tags: f.tags.length > 0, photo: Boolean(note?.hasImage), date: f.hasDate });
     setNewItem('');
     setTagInput('');
     setImage('keep');
@@ -111,7 +117,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
     // etiqueta digitada e não confirmada com Enter também entra
     const pendingTags = parseTagInput(tagInput);
     const pendingItem = newItem.trim();
-    const ok = await onSave(
+    const result = await onSave(
       {
         folderId: form.folderId,
         title: form.title,
@@ -129,8 +135,24 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
       image,
     );
     setSaving(false);
-    if (ok) onClose();
+    if (result === true) return onClose();
+    if (result?.error) {
+      setError(result.error);
+      // erro no título: volta o cursor para lá
+      if (/título/i.test(result.error)) titleRef.current?.focus();
+    }
   }
+
+  const titleError = /título/i.test(error) ? error : '';
+  const otherError = titleError ? '' : error;
+  // Campos extras só aparecem quando a pessoa pede (ou quando o post-it já usa)
+  const show = (key) => extras[key];
+  const addable = [
+    ['checklist', '☑️ Checklist'],
+    ['tags', '🏷️ Etiqueta'],
+    ['photo', '📷 Foto'],
+    ['date', '📅 Data'],
+  ].filter(([key]) => !show(key));
 
   return (
     <AnimatePresence>
@@ -153,15 +175,43 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             <span className="postit-tape" />
             <h2>{note ? 'Editar post-it' : 'Novo post-it'}</h2>
 
+            <label className="sr-only" htmlFor="note-title">
+              Título
+            </label>
             <input
-              className="note-title-input"
+              id="note-title"
+              ref={titleRef}
+              className={`note-title-input ${titleError ? 'invalid' : ''}`}
               placeholder="Título (ex: Aniversário da Ana)"
               value={form.title}
-              onChange={set('title')}
+              onChange={(e) => {
+                set('title')(e);
+                if (titleError) setError('');
+              }}
               maxLength={80}
+              aria-invalid={Boolean(titleError)}
+              aria-describedby={titleError ? 'note-title-error' : undefined}
               autoFocus
             />
+            <AnimatePresence>
+              {titleError && (
+                <motion.small
+                  id="note-title-error"
+                  className="field-error"
+                  role="alert"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  ⚠️ {titleError} Escreva algo curto, como “Dentista” ou “Comprar pão”.
+                </motion.small>
+              )}
+            </AnimatePresence>
+            <label className="sr-only" htmlFor="note-content">
+              Texto da nota
+            </label>
             <textarea
+              id="note-content"
               placeholder="Escreva sua nota..."
               value={form.content}
               onChange={set('content')}
@@ -170,116 +220,143 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             />
 
             {/* Checklist */}
-            <div className="modal-section">
-              <span className="modal-label">☑️ Checklist</span>
-              <AnimatePresence initial={false}>
-                {form.checklist.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    className={`check-edit ${item.done ? 'done' : ''}`}
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <input type="checkbox" checked={item.done} onChange={(e) => updateItem(item.id, { done: e.target.checked })} aria-label="Feito" />
-                    <input
-                      className="check-edit-text"
-                      value={item.text}
-                      maxLength={120}
-                      onChange={(e) => updateItem(item.id, { text: e.target.value })}
-                    />
-                    <button type="button" className="icon-mini" onClick={() => removeItem(item.id)} aria-label="Remover item">
-                      ✕
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {form.checklist.length < 30 && (
-                <div className="check-add">
-                  <input
-                    placeholder="+ Adicionar item (Enter)"
-                    value={newItem}
-                    maxLength={120}
-                    onChange={(e) => setNewItem(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addItem();
-                      }
-                    }}
-                  />
-                  <button type="button" className="icon-mini" onClick={addItem} aria-label="Adicionar item">
-                    ＋
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Etiquetas */}
-            <div className="modal-section">
-              <span className="modal-label">🏷️ Etiquetas</span>
-              <div className="tag-edit">
-                {form.tags.map((t) => (
-                  <span key={t} className="tag-chip" style={{ background: tagColor(t) }}>
-                    #{t}
-                    <button type="button" onClick={() => setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))} aria-label={`Tirar #${t}`}>
-                      ✕
-                    </button>
-                  </span>
-                ))}
-                {form.tags.length < 6 && (
-                  <input
-                    placeholder={form.tags.length ? '+ etiqueta' : 'ex: urgente, ideia (Enter)'}
-                    value={tagInput}
-                    maxLength={40}
-                    onChange={(e) => {
-                      // vírgula ou espaço já confirmam a etiqueta
-                      if (/[,\s]$/.test(e.target.value)) addTags(e.target.value);
-                      else setTagInput(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTags();
-                      } else if (e.key === 'Backspace' && !tagInput && form.tags.length) {
-                        setForm((f) => ({ ...f, tags: f.tags.slice(0, -1) }));
-                      }
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Foto */}
-            <div className="modal-section">
-              <span className="modal-label">📷 Foto</span>
-              {preview && image !== 'remove' ? (
-                <div className="image-preview">
-                  <img src={preview} alt="Prévia da foto" />
-                  <div>
-                    <button type="button" className="btn-ghost small" onClick={() => fileRef.current?.click()}>
-                      Trocar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost small"
-                      onClick={() => {
-                        setImage(note?.hasImage ? 'remove' : 'keep');
-                        setPreview(null);
-                      }}
+            {show('checklist') && (
+              <div className="modal-section">
+                <span className="modal-label">☑️ Checklist</span>
+                <AnimatePresence initial={false}>
+                  {form.checklist.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      className={`check-edit ${item.done ? 'done' : ''}`}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
                     >
-                      Remover
+                      <input type="checkbox" checked={item.done} onChange={(e) => updateItem(item.id, { done: e.target.checked })} aria-label="Feito" />
+                      <input
+                        className="check-edit-text"
+                        value={item.text}
+                        maxLength={120}
+                        onChange={(e) => updateItem(item.id, { text: e.target.value })}
+                      />
+                      <button type="button" className="icon-mini" onClick={() => removeItem(item.id)} aria-label="Remover item">
+                        ✕
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {form.checklist.length < 30 && (
+                  <div className="check-add">
+                    <input
+                      placeholder="+ Adicionar item (Enter)"
+                      value={newItem}
+                      maxLength={120}
+                      onChange={(e) => setNewItem(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addItem();
+                        }
+                      }}
+                    />
+                    <button type="button" className="icon-mini" onClick={addItem} aria-label="Adicionar item">
+                      ＋
                     </button>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Etiquetas */}
+            {show('tags') && (
+              <div className="modal-section">
+                <span className="modal-label">🏷️ Etiquetas</span>
+                <div className="tag-edit">
+                  {form.tags.map((t) => (
+                    <span key={t} className="tag-chip" style={{ background: tagColor(t) }}>
+                      #{t}
+                      <button type="button" onClick={() => setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))} aria-label={`Tirar #${t}`}>
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                  {form.tags.length < 6 && (
+                    <input
+                      placeholder={form.tags.length ? '+ etiqueta' : 'ex: urgente, ideia (Enter)'}
+                      value={tagInput}
+                      maxLength={40}
+                      onChange={(e) => {
+                        // vírgula ou espaço já confirmam a etiqueta
+                        if (/[,\s]$/.test(e.target.value)) addTags(e.target.value);
+                        else setTagInput(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addTags();
+                        } else if (e.key === 'Backspace' && !tagInput && form.tags.length) {
+                          setForm((f) => ({ ...f, tags: f.tags.slice(0, -1) }));
+                        }
+                      }}
+                    />
+                  )}
                 </div>
-              ) : (
-                <button type="button" className="image-pick" onClick={() => fileRef.current?.click()}>
-                  + Adicionar foto (ex.: foto da receita)
-                </button>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickImage} />
-              {imageError && <small className="modal-error">{imageError}</small>}
-            </div>
+              </div>
+            )}
+
+            {/* Foto */}
+            {show('photo') && (
+              <div className="modal-section">
+                <span className="modal-label">📷 Foto</span>
+                {preview && image !== 'remove' ? (
+                  <div className="image-preview">
+                    <img src={preview} alt="Prévia da foto" />
+                    <div>
+                      <button type="button" className="btn-ghost small" onClick={() => fileRef.current?.click()}>
+                        Trocar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        onClick={() => {
+                          setImage(note?.hasImage ? 'remove' : 'keep');
+                          setPreview(null);
+                        }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="image-pick" onClick={() => fileRef.current?.click()}>
+                    + Adicionar foto (ex.: foto da receita)
+                  </button>
+                )}
+                {imageError && <small className="modal-error">{imageError}</small>}
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickImage} />
+
+            {/* Projeto minimalista: o básico à vista; o resto a pessoa adiciona se quiser */}
+            {addable.length > 0 && (
+              <div className="add-extras" role="group" aria-label="Adicionar ao post-it">
+                <span>Adicionar:</span>
+                {addable.map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="extra-chip"
+                    onClick={() => {
+                      setExtras((x) => ({ ...x, [key]: true }));
+                      if (key === 'date') setForm((f) => ({ ...f, hasDate: true }));
+                      if (key === 'photo') fileRef.current?.click();
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="color-row" role="radiogroup" aria-label="Cor">
               {COLORS.map((c) => (
@@ -318,13 +395,15 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
               </label>
             )}
 
-            <label className="toggle">
-              <input type="checkbox" checked={form.hasDate} onChange={set('hasDate')} />
-              <span className="toggle-track">
-                <span className="toggle-thumb" />
-              </span>
-              Marcar uma data importante
-            </label>
+            {show('date') && (
+              <label className="toggle">
+                <input type="checkbox" checked={form.hasDate} onChange={set('hasDate')} />
+                <span className="toggle-track">
+                  <span className="toggle-thumb" />
+                </span>
+                Marcar uma data importante
+              </label>
+            )}
 
             <AnimatePresence initial={false}>
               {form.hasDate && (
@@ -402,6 +481,12 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {otherError && (
+              <small className="field-error" role="alert">
+                ⚠️ {otherError}
+              </small>
+            )}
 
             <div className="modal-buttons">
               <button type="button" className="btn-ghost" onClick={onClose}>

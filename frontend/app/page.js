@@ -551,6 +551,8 @@ export default function BoardPage() {
       if (form.eventDate) loadAlerts().catch(() => {});
       return true;
     } catch (err) {
+      // erro de preenchimento (o back recusou): o formulário mostra ao lado do campo, não num balão longe
+      if (err.status === 400) return { error: err.message };
       handleAuthError(err);
       return false;
     }

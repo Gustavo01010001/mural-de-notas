@@ -69,6 +69,7 @@ export default function PostIt({
   const drag = useRef(null);
   const resize = useRef(null);
   const menuRef = useRef(null);
+  const justDragged = useRef(false); // o clique que vem logo depois de arrastar não abre a edição
 
   // Atualiza posição/tamanho se o back devolver outro (mas não no meio do arrasto)
   useEffect(() => {
@@ -111,6 +112,7 @@ export default function PostIt({
   function handleUp(e) {
     const d = drag.current;
     drag.current = null;
+    justDragged.current = !!d?.moved;
     setDragging(false);
     if (d?.moved && onDrop?.(note, e.clientX, e.clientY)) {
       // soltou em cima de uma pasta: o post-it vai para lá (não salva posição aqui)
@@ -126,8 +128,12 @@ export default function PostIt({
   }
 
   function handleClick(e) {
+    const wasDrag = justDragged.current;
+    justDragged.current = false;
     if (e.target.closest(INTERACTIVE)) return;
-    if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) onSelect(note.id);
+    if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) return onSelect(note.id);
+    // no toque não existe duplo clique "natural": um toque no post-it já abre para editar
+    if (!wasDrag && window.matchMedia('(hover: none)').matches) onEdit(note);
   }
 
   // ----- redimensionar (canto inferior direito) -----

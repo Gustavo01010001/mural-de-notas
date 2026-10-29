@@ -1,0 +1,525 @@
+/* =====================================================================
+   Tema claro (para quem não gosta do fundo preto)
+   ===================================================================== */
+html.theme-light {
+  --bg: #f4f0e8;
+  --text: #1f1f24;
+  --muted: #5b5b66;
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(0, 0, 0, 0.12);
+  --accent: #b8860b;
+}
+
+html.theme-light,
+html.theme-light body {
+  background: var(--bg);
+}
+
+/* mural de cortiça clarinho, com pontinhos */
+html.theme-light .board {
+  background:
+    radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1.5px) 0 0 / 22px 22px,
+    radial-gradient(ellipse at top, #fffaf0 0%, transparent 60%),
+    var(--bg);
+}
+
+html.theme-light .stars {
+  display: none;
+}
+
+html.theme-light .spotlight {
+  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 196, 0, 0.1), transparent 60%);
+}
+
+html.theme-light .scene-bg {
+  opacity: 0.35 !important;
+}
+
+html.theme-light .bg-dim {
+  background: #fff;
+}
+
+/* painéis e janelas: fundo claro */
+html.theme-light :is(.folder-panel, .drawer, .search-panel, .trash-panel, .share-modal, .calendar-panel, .toast, .selection-bar, .drop-dock, .tag-filter-pill, .postit-menu-list, .auth-card, .upcoming, .focus-timer) {
+  background: rgba(255, 255, 255, 0.97);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgba(60, 40, 0, 0.18);
+}
+
+html.theme-light .postit-actions .postit-menu-list button {
+  color: #222;
+}
+
+html.theme-light .postit-actions .postit-menu-list button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+html.theme-light .weather {
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(60, 40, 0, 0.15);
+}
+
+html.theme-light .weather::before {
+  opacity: 0.4;
+}
+
+html.theme-light :is(.folder-row:hover, .search-item.active, .calendar-day, .trash-item-plain, .share-list li, .weather-stats span, .segmented, .folder-special button, .search-recent button:not(.btn-text), .search-example, .sel-btn, .sel-move select, .forecast-day) {
+  background: rgba(0, 0, 0, 0.045);
+}
+
+html.theme-light .calendar-day.has {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+html.theme-light :is(.field input, .name-form input, .share-invite input, .folder-editor input, .folder-editor-parent select, .sf-row select, .account-form input) {
+  background: #fff;
+  color: var(--text);
+}
+
+html.theme-light .auth-page {
+  background: radial-gradient(ellipse at center, #fffaf0 0%, var(--bg) 70%);
+}
+
+html.theme-light .postit {
+  box-shadow:
+    0 2px 4px rgba(60, 40, 0, 0.18),
+    0 12px 24px rgba(60, 40, 0, 0.2);
+}
+
+html.theme-light .modal-backdrop,
+html.theme-light .drawer-backdrop,
+html.theme-light .search-backdrop {
+  background: rgba(40, 30, 10, 0.35);
+}
+
+html.theme-light .fab {
+  box-shadow: 0 8px 24px rgba(184, 134, 11, 0.35);
+}
+
+html.theme-light .toast-action {
+  background: #ffd43b;
+}
+
+/* =====================================================================
+   Alto contraste (baixa visão)
+   ===================================================================== */
+html.hc {
+  --muted: var(--text);
+  --glass-border: rgba(255, 255, 255, 0.75);
+}
+
+html.hc.theme-light {
+  --glass-border: rgba(0, 0, 0, 0.8);
+  --accent: #7a5300;
+}
+
+html.hc :is(.folder-panel, .drawer, .search-panel, .trash-panel, .share-modal, .calendar-panel, .toast, .selection-bar, .weather, .topbar > :not(.folder-switcher), .folder-trigger, .upcoming, .focus-timer, .auth-card) {
+  backdrop-filter: none !important;
+  border: 2px solid var(--glass-border) !important;
+}
+
+/* o seletor de pasta é só um invólucro: a borda fica no botão de dentro */
+html.hc .folder-switcher {
+  border: none !important;
+}
+
+html.hc.theme-dark :is(.folder-panel, .drawer, .search-panel, .trash-panel, .share-modal, .calendar-panel, .toast, .selection-bar, .weather, .upcoming, .focus-timer, .auth-card) {
+  background: #000 !important;
+}
+
+html.hc .postit {
+  border: 2px solid rgba(0, 0, 0, 0.75);
+  color: #000;
+}
+
+html.hc .postit-content,
+html.hc .check-text,
+html.hc .postit-event {
+  opacity: 1 !important;
+  color: #000;
+}
+
+html.hc .postit-checklist li.done .check-text {
+  opacity: 0.8 !important;
+}
+
+html.hc .postit-tags button {
+  outline: 1.5px solid rgba(0, 0, 0, 0.6);
+}
+
+html.hc a {
+  text-decoration: underline;
+}
+
+html.hc :focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 3px !important;
+}
+
+html.hc .scene-bg,
+html.hc .stars {
+  opacity: 0.25 !important;
+}
+
+/* =====================================================================
+   Timer de foco (Pomodoro) — discreto, embaixo
+   ===================================================================== */
+.focus-timer {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 10002;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 18px;
+  background: rgba(18, 18, 26, 0.92);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.focus-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left;
+  background: #ff6b6b;
+  transition: transform 0.25s linear;
+}
+
+.focus-timer.break .focus-progress {
+  background: #51cf66;
+}
+
+.focus-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.focus-mode {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.focus-time {
+  font-size: 1.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.focus-count {
+  font-size: 0.85rem;
+}
+
+.focus-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.focus-actions button,
+.focus-mini {
+  min-width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+html.theme-light .focus-actions button,
+html.theme-light .focus-mini {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.focus-actions button.primary {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+
+.focus-timer.mini {
+  padding: 6px;
+}
+
+.focus-mini {
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* =====================================================================
+   Previsão de 5 dias
+   ===================================================================== */
+.forecast {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.72rem;
+}
+
+.forecast-name {
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.forecast-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.forecast-temp b {
+  font-weight: 700;
+}
+
+.forecast-rain {
+  font-size: 0.62rem;
+  color: #74c0fc;
+}
+
+/* =====================================================================
+   Conta e privacidade (configurações)
+   ===================================================================== */
+.account-buttons {
+  display: grid;
+  gap: 8px;
+}
+
+.account-btn {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+
+.account-btn span {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.account-btn small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.account-btn:hover {
+  border-color: var(--accent);
+}
+
+.account-toggle {
+  display: block;
+  margin-top: 12px;
+  padding: 4px 0;
+  font-size: 0.88rem;
+}
+
+.account-toggle.danger {
+  color: #ff8787;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding-top: 6px;
+}
+
+.account-form input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  outline: none;
+}
+
+.account-form small,
+.account-form p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.account-form p .btn-small {
+  margin-left: 6px;
+  padding: 5px 10px;
+}
+
+.account-form.danger {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(224, 49, 49, 0.4);
+  background: rgba(224, 49, 49, 0.06);
+}
+
+.account-warn {
+  color: #ffc078 !important;
+}
+
+html.theme-light .account-warn {
+  color: #a0520a !important;
+}
+
+/* =====================================================================
+   Página de impressão / PDF
+   ===================================================================== */
+.print-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+  color: var(--text);
+}
+
+.print-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.print-head h1 {
+  margin: 0;
+}
+
+.print-head p,
+.print-tip {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.print-group h2 {
+  margin: 28px 0 10px;
+  font-size: 1.1rem;
+}
+
+.print-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.print-note {
+  padding: 12px 14px;
+  border-radius: 4px 4px 4px 14px;
+  color: #222;
+  break-inside: avoid;
+}
+
+.print-note h3 {
+  margin: 0 0 6px;
+  font-family: var(--font-hand), cursive;
+  font-size: 1.4rem;
+}
+
+.print-note p,
+.print-note ul {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.print-note ul {
+  padding-left: 4px;
+  list-style: none;
+}
+
+.print-note img {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.print-date,
+.print-tags {
+  opacity: 0.75;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .print-page {
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-note {
+    border: 1px solid #ccc;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ----- celular ----- */
+@media (max-width: 720px) {
+  /* no celular ocupa a largura toda, acima das ferramentas do mural */
+  .focus-timer {
+    left: 12px;
+    right: 12px;
+    bottom: calc(146px + env(safe-area-inset-bottom));
+    transform: none !important;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 8px 8px 12px;
+  }
+
+  .focus-timer.mini {
+    left: auto;
+  }
+
+  .focus-actions button {
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .focus-time {
+    font-size: 1.4rem;
+  }
+
+  .focus-count {
+    display: none;
+  }
+
+  .forecast-icon {
+    width: 26px;
+    height: 26px;
+  }
+}

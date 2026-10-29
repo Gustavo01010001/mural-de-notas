@@ -6,7 +6,7 @@ export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 1.6;
 
 // Ferramentas discretas do mural (canto de baixo): zoom, arrumar e selecionar
-export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, selecting, showFreeTools }) {
+export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, selecting, showFreeTools, focusOn, onFocusTimer }) {
   return (
     <motion.div className="board-tools" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       {showFreeTools && (
@@ -30,6 +30,9 @@ export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, s
           </button>
         </>
       )}
+      <button type="button" className={`tool-btn ${focusOn ? 'active' : ''}`} onClick={onFocusTimer} title="Timer de foco (Pomodoro)" aria-pressed={focusOn}>
+        ⏱ <span className="tool-label">Foco</span>
+      </button>
       <button type="button" className={`tool-btn ${selecting ? 'active' : ''}`} onClick={onSelectMode} title="Selecionar vários post-its">
         ☑ <span className="tool-label">{selecting ? 'Cancelar' : 'Selecionar'}</span>
       </button>

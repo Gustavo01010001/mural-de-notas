@@ -2,6 +2,7 @@ import { Caveat, Inter } from 'next/font/google';
 import { ToastProvider } from '@/components/Toasts';
 import './globals.css';
 import './features.css';
+import './a11y.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-ui' });
 const caveat = Caveat({ subsets: ['latin'], weight: ['500', '700'], variable: '--font-hand' });

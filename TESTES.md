@@ -118,3 +118,27 @@ calendário, busca com filtros e formulário com os campos novos cabem na tela.
 ícone 📁; nome da pasta com mais espaço no topo do celular; testes não abrem mais o banco real.
 
 **Não testado:** dois aparelhos físicos diferentes (foram duas abas no mesmo PC), notificação do navegador fora da aba.
+
+---
+
+# ✅ Rodada 4 — Visual, acessibilidade, conta e segurança (29/10/2026)
+
+**Automáticos:** `npm test` → **60/60 passando** (novos: cookie seguro e suas flags, bloqueio CSRF sem
+`X-Mural`, migração de token antigo, 429 após tentativas, trocar senha, esqueci/redefinir senha,
+exportar/importar backup, excluir e restaurar conta, backup do banco, validação das novas configurações).
+**Build:** `next build` ok (rotas `/`, `/login`, `/cadastro`, `/exportar`).
+
+**Navegador (PC):**
+- Cadastro pela tela → sessão só no cookie (JS não enxerga; nada de token no `localStorage`).
+- Pedido sem `X-Mural` → 403. Backup baixado como `mural-de-notas-backup-AAAA-MM-DD.json` com pastas e post-its.
+- Tema claro, letra A++ (20,8 px), alto contraste, sons, timer de foco: tudo aplicado na hora.
+- Timer: contou (24:58), tempo aparece no título da aba, pausar congela o tempo.
+- Previsão de 5 dias aparece no clima (Hoje + 4 dias, máx/mín e chuva).
+
+**Navegador (celular 375×812):** timer ocupa a largura toda acima das ferramentas, sem cortar.
+
+**Corrigido nesta rodada:**
+- Alto contraste deixava borda dupla e torta no seletor "Mural geral" (borda no invólucro e no botão).
+- No celular o timer de foco saía pela direita e cobria o zoom.
+
+**Não testado:** impressão real do PDF, exclusão de conta pela tela (testada pela API), e-mail e Google (sem tela).

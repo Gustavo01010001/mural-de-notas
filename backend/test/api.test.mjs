@@ -34,8 +34,11 @@ async function call(p, { method = 'GET', body, token, headers = {}, raw } = {}) 
 
 let seq = 0;
 async function newUser(name = 'Usuária Teste') {
-  const email = `user${Date.now()}${seq++}@teste.dev`;
-  const r = await call('/auth/register', { method: 'POST', body: { name, email, password: 'senha-forte-1' } });
+  const n = seq++;
+  const email = `user${Date.now()}${n}@teste.dev`;
+  // cada usuário de teste "vem" de um IP diferente (o limite de cadastros é por IP)
+  const ip = `10.9.${Math.floor(n / 250)}.${(n % 250) + 1}`;
+  const r = await call('/auth/register', { method: 'POST', headers: { 'X-Forwarded-For': ip }, body: { name, email, password: 'senha-forte-1' } });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   return { token: r.data.token, user: r.data.user, email };
 }
@@ -49,7 +52,15 @@ const addDays = (ymd, n) => {
 before(async () => {
   server = spawn(process.execPath, ['src/server.js'], {
     cwd: path.resolve(import.meta.dirname, '..'),
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DB_DIR: dbDir, GOOGLE_WEATHER_API_KEY: '' },
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      HOST: '127.0.0.1',
+      DB_DIR: dbDir,
+      GOOGLE_WEATHER_API_KEY: '',
+      SMTP_HOST: '',
+      DEV_SHOW_RESET_LINK: '1', // só nos testes: o link de redefinir senha vem na resposta
+    },
     stdio: 'pipe',
   });
   for (let i = 0; i < 50; i++) {
@@ -881,6 +892,159 @@ describe('Busca com filtros e por data', () => {
     assert.deepEqual(dez.results.map((n) => n.title).sort(), ['Natal', 'Niver Bia']);
     assert.deepEqual((await s(`q=${encodeURIComponent('25/12/2026')}`)).results.map((n) => n.title), ['Natal']);
     assert.deepEqual((await s('q=niver%20dezembro')).results.map((n) => n.title), ['Niver Bia']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Sessão em cookie seguro, limite de tentativas e senha', () => {
+  const PASS = 'senha-forte-1';
+  const cookieOf = (res) => res.headers.get('set-cookie') ?? '';
+
+  test('no navegador a sessão vai num cookie httpOnly (o token não aparece no corpo)', async () => {
+    const u = await newUser();
+    const r = await call('/auth/login', { method: 'POST', headers: { 'X-Mural': '1', 'X-Forwarded-Proto': 'https' }, body: { email: u.email, password: PASS } });
+    assert.equal(r.status, 200);
+    assert.ok(!('token' in r.data));
+    const c = cookieOf(r);
+    assert.match(c, /mural_session=/);
+    assert.match(c, /HttpOnly/i);
+    assert.match(c, /Secure/i);
+    assert.match(c, /SameSite=Lax/i);
+    const cookie = c.split(';')[0];
+
+    assert.equal((await call('/auth/me', { headers: { Cookie: cookie } })).status, 200);
+    // mudança com cookie mas sem o cabeçalho X-Mural = bloqueada (proteção CSRF)
+    assert.equal((await call('/notes', { method: 'POST', headers: { Cookie: cookie }, body: { title: 'x' } })).status, 403);
+    assert.equal((await call('/notes', { method: 'POST', headers: { Cookie: cookie, 'X-Mural': '1' }, body: { title: 'ok' } })).status, 201);
+
+    // sair apaga o cookie e invalida a sessão
+    const out = await call('/auth/logout', { method: 'POST', headers: { Cookie: cookie, 'X-Mural': '1' } });
+    assert.match(cookieOf(out), /mural_session=;/);
+    assert.equal((await call('/auth/me', { headers: { Cookie: cookie } })).status, 401);
+  });
+
+  test('token antigo (localStorage) vira cookie uma vez só', async () => {
+    const u = await newUser();
+    const r = await call('/auth/cookie', { method: 'POST', token: u.token });
+    assert.match(cookieOf(r), /mural_session=/);
+    assert.equal((await call('/auth/me', { token: u.token })).status, 401); // o antigo morreu
+  });
+
+  test('muitas senhas erradas bloqueiam por um tempo', async () => {
+    const u = await newUser();
+    const headers = { 'X-Forwarded-For': '10.200.0.7' };
+    let last;
+    for (let i = 0; i < 9; i++) last = await call('/auth/login', { method: 'POST', headers, body: { email: u.email, password: 'errada' } });
+    assert.equal(last.status, 429);
+    // até a senha certa espera o bloqueio passar (mesmo IP + e-mail)
+    assert.equal((await call('/auth/login', { method: 'POST', headers, body: { email: u.email, password: PASS } })).status, 429);
+    // de outro lugar, funciona
+    assert.equal((await call('/auth/login', { method: 'POST', headers: { 'X-Forwarded-For': '10.200.0.8' }, body: { email: u.email, password: PASS } })).status, 200);
+  });
+
+  test('trocar senha derruba as outras sessões', async () => {
+    const u = await newUser();
+    const other = (await call('/auth/login', { method: 'POST', headers: { 'X-Forwarded-For': '10.201.0.1' }, body: { email: u.email, password: PASS } })).data.token;
+    assert.equal((await call('/auth/password', { method: 'POST', token: u.token, body: { current: 'errada', password: 'nova-senha-123' } })).status, 401);
+    assert.equal((await call('/auth/password', { method: 'POST', token: u.token, body: { current: PASS, password: 'nova-senha-123' } })).status, 200);
+    assert.equal((await call('/auth/me', { token: u.token })).status, 200); // a atual continua
+    assert.equal((await call('/auth/me', { token: other })).status, 401); // a outra caiu
+    assert.equal((await call('/auth/login', { method: 'POST', headers: { 'X-Forwarded-For': '10.201.0.2' }, body: { email: u.email, password: 'nova-senha-123' } })).status, 200);
+  });
+
+  test('esqueci minha senha (pronto no servidor, desligado na tela por enquanto)', async () => {
+    const u = await newUser();
+    const ghost = await call('/auth/forgot', { method: 'POST', headers: { 'X-Forwarded-For': '10.202.0.1' }, body: { email: 'ninguem@x.dev' } });
+    const real = await call('/auth/forgot', { method: 'POST', headers: { 'X-Forwarded-For': '10.202.0.1' }, body: { email: u.email } });
+    assert.equal(ghost.data.message, real.data.message); // não revela quem tem conta
+    const code = new URL(real.data.devLink).searchParams.get('codigo');
+    assert.equal((await call('/auth/reset', { method: 'POST', body: { token: code, password: '123' } })).status, 400);
+    assert.equal((await call('/auth/reset', { method: 'POST', body: { token: code, password: 'outra-senha-9' } })).status, 200);
+    assert.equal((await call('/auth/reset', { method: 'POST', body: { token: code, password: 'outra-senha-9' } })).status, 400); // uma vez só
+    assert.equal((await call('/auth/me', { token: u.token })).status, 401); // sessões antigas caíram
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Backup, importar e excluir conta (LGPD)', () => {
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  test('exportar tudo e importar em outra conta', async () => {
+    const a = await newUser('Dona do backup');
+    const f = (await call('/folders', { method: 'POST', token: a.token, body: { name: 'Senhas e contas', icon: '🧠' } })).data.folder;
+    const sub = (await call('/folders', { method: 'POST', token: a.token, body: { name: 'Banco', parentId: f.id } })).data.folder;
+    const n = (await call('/notes', { method: 'POST', token: a.token, body: { title: 'Wi-Fi de casa', content: 'rede: Casa', folderId: sub.id, checklist: [{ text: 'trocar senha' }], tags: ['casa'], eventDate: '2026-12-01', eventType: 'reminder', eventTime: '09:00', repeat: 'monthly' } })).data.note;
+    await call(`/notes/${n.id}/image`, { method: 'PUT', token: a.token, body: { dataUrl: PNG } });
+    const arch = (await call('/notes', { method: 'POST', token: a.token, body: { title: 'Velho' } })).data.note;
+    await call(`/notes/${arch.id}/archive`, { method: 'POST', token: a.token, body: { archived: true } });
+    const trash = (await call('/notes', { method: 'POST', token: a.token, body: { title: 'Lixo' } })).data.note;
+    await call(`/notes/${trash.id}`, { method: 'DELETE', token: a.token });
+
+    const res = await fetch(`${BASE}/account/export`, { headers: { Authorization: `Bearer ${a.token}` } });
+    assert.match(res.headers.get('content-disposition'), /attachment; filename="mural-de-notas-backup-/);
+    const backup = await res.json();
+    assert.equal(backup.app, 'mural-de-notas');
+    assert.equal(backup.folders.length, 2);
+    assert.equal(backup.notes.length, 3);
+    const wifi = backup.notes.find((x) => x.title === 'Wi-Fi de casa');
+    assert.match(wifi.image, /^data:image\/png;base64,/);
+    assert.equal(wifi.repeat, 'monthly');
+
+    const b = await newUser('Conta nova');
+    const imp = await call('/account/import', { method: 'POST', token: b.token, body: { backup } });
+    assert.equal(imp.status, 200, JSON.stringify(imp.data));
+    assert.equal(imp.data.imported, 2); // lixeira não volta
+    assert.equal(imp.data.folders, 2);
+    const folders = (await call('/folders', { token: b.token })).data.folders;
+    const banco = folders.find((x) => x.name === 'Banco');
+    assert.ok(banco.parentId, 'subpasta continua subpasta');
+    const notes = (await call(`/notes?folder=${banco.id}`, { token: b.token })).data.notes;
+    assert.equal(notes[0].title, 'Wi-Fi de casa');
+    assert.equal(notes[0].hasImage, true);
+    assert.equal(notes[0].eventTime, '09:00');
+    assert.equal((await call('/notes/archived', { token: b.token })).data.notes[0].title, 'Velho');
+
+    assert.equal((await call('/account/import', { method: 'POST', token: b.token, body: { backup: { app: 'outro' } } })).status, 400);
+  });
+
+  test('excluir conta: pede a senha, some na hora e volta se entrar em 30 dias', async () => {
+    const u = await newUser('Vai e volta');
+    const n = (await call('/notes', { method: 'POST', token: u.token, body: { title: 'Não quero perder' } })).data.note;
+    const f = (await call('/folders', { method: 'POST', token: u.token, body: { name: 'Compartilhada' } })).data.folder;
+    const friend = await newUser('Amiga');
+    await call(`/folders/${f.id}/members`, { method: 'POST', token: u.token, body: { email: friend.email } });
+
+    assert.equal((await call('/account', { method: 'DELETE', token: u.token, body: { password: 'errada' } })).status, 401);
+    const del = await call('/account', { method: 'DELETE', token: u.token, body: { password: 'senha-forte-1' } });
+    assert.equal(del.status, 200);
+    assert.equal(del.data.graceDays, 30);
+    assert.equal((await call('/auth/me', { token: u.token })).status, 401); // saiu de todo lugar
+    // ninguém consegue convidar a conta em exclusão
+    const fx = (await call('/folders', { method: 'POST', token: friend.token, body: { name: 'Da amiga' } })).data.folder;
+    assert.equal((await call(`/folders/${fx.id}/members`, { method: 'POST', token: friend.token, body: { email: u.email } })).status, 404);
+
+    // entrou de novo dentro do prazo: tudo volta
+    const back = await call('/auth/login', { method: 'POST', headers: { 'X-Forwarded-For': '10.203.0.1' }, body: { email: u.email, password: 'senha-forte-1' } });
+    assert.equal(back.status, 200);
+    assert.match(back.data.message, /recuperad/);
+    assert.ok((await call('/notes', { token: back.data.token })).data.notes.some((x) => x.id === n.id));
+  });
+
+  test('backup automático do banco foi criado ao iniciar', () => {
+    const dir = path.join(dbDir, 'backups');
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.db')) : [];
+    assert.ok(files.length >= 1, 'deveria existir pelo menos 1 backup');
+    assert.ok(fs.statSync(path.join(dir, files[0])).size > 1000);
+  });
+
+  test('novas configurações de aparência são validadas', async () => {
+    const u = await newUser();
+    const ok = await call('/settings', { method: 'PUT', token: u.token, body: { theme: 'light', fontScale: 1.3, highContrast: true, sounds: true, soundVolume: 0.3, showFocusTimer: true, focusMinutes: 50, breakMinutes: 10 } });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.data.settings.theme, 'light');
+    for (const body of [{ theme: 'rosa' }, { fontScale: 3 }, { sounds: 'sim' }, { focusMinutes: 7 }]) {
+      assert.equal((await call('/settings', { method: 'PUT', token: u.token, body })).status, 400, JSON.stringify(body));
+    }
   });
 });
 

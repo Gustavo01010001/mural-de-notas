@@ -82,6 +82,10 @@ em BLOB), `folders` (dono, nome, ícone, cor, pai, posição), `folder_members`,
 9. **Rodada 3**: subpastas (3 níveis), cor e ordem das pastas, arrastar post-it até pasta, **compartilhar pasta com
    cursores e mudanças ao vivo**, lembrete com horário + aviso antecipado, repetição semanal/mensal/anual,
    calendário do mês, Google Agenda, busca com filtros/por data/recentes.
+10. **Rodada 4**: tema claro/automático, tamanho da letra, alto contraste, timer de foco (Pomodoro),
+   previsão de 5 dias, sons suaves (Web Audio, sem arquivos); sessão em cookie httpOnly com token em hash,
+   proteção CSRF, limite de tentativas, trocar senha, backup JSON/PDF/importar, excluir conta com 30 dias
+   para voltar, backup diário do banco. E-mail de "esqueci a senha" e login Google: backend pronto, sem tela.
 
 ## 5. Decisões importantes (e por quê)
 
@@ -99,13 +103,20 @@ em BLOB), `folders` (dono, nome, ícone, cor, pai, posição), `folder_members`,
 | Alertas fechados guardados por "dia:etapa" | aviso antecipado e "na hora" são fechados separadamente |
 | Funções puras em `utils/` (`dates`, `dateQuery`, `reminders`, `text`) | testes não abrem o banco real |
 | Zoom/arrumar/redimensionar/arrastar só no modo livre (PC) | no toque não fazem sentido na grade |
+| Sessão em cookie `mural_session` + hash SHA-256 no banco | JS não lê a sessão; vazamento do banco não dá acesso |
+| Cookie + método ≠ GET exige `X-Mural: 1` | CSRF: outro site não consegue mandar esse cabeçalho |
+| Bearer continua aceito; token no corpo só sem `X-Mural` | testes e scripts (seed) seguem funcionando |
+| `trust proxy` = loopback; rate limit por `req.ip` | o Next repassa o IP real; ninguém de fora forja o IP |
+| Excluir conta = `deleted_at` + 30 dias | arrependimento/engano; login dentro do prazo restaura |
+| Backup com `VACUUM INTO` (1/dia, guarda 7) | cópia consistente com o banco aberto, sem parar o servidor |
+| Aparência também em `localStorage` (`mural_look`) | evita "piscar" o tema escuro antes de carregar |
 
 ## 6. Como rodar e testar
 
 ```bash
 cd backend && npm install && npm run dev      # API em 127.0.0.1:4000
 cd frontend && npm install && npm run dev     # HTTPS em https://localhost:3000 e https://SEU_IP:3000
-cd backend && npm test                        # 51 testes (banco temporário)
+cd backend && npm test                        # 60 testes (banco temporário)
 cd backend && npm run seed -- <email> <senha> # dados de exemplo (6 pastas, 40 post-its)
 ```
 
@@ -124,7 +135,7 @@ Certificado no Windows (já feito pelo dono): `certutil -user -addstore Root "fr
 
 ## 8. Erros / pendências conhecidas
 
-Nenhum erro bloqueante aberto: 51/51 testes, build ok, sem erros de código no console.
+Nenhum erro bloqueante aberto: 60/60 testes, build ok, sem erros de código no console.
 Limitações e pontos de atenção:
 
 - **Aviso de certificado em celulares de outras pessoas**: só some instalando a CA ou publicando com domínio real.
@@ -134,7 +145,9 @@ Limitações e pontos de atenção:
 - **Reordenar pastas arrastando a alça ⠿** foi testado pela API, não com arrasto real automatizado.
 - **Convidado não recebe alertas** das datas dos post-its da pasta compartilhada (só o dono).
 - Subpastas de uma pasta compartilhada **não** são compartilhadas junto.
-- Token em `localStorage` (cookie httpOnly seria mais seguro); **sem limite de tentativas de login**.
+- Sessões antigas (token sem hash) caíram: cada pessoa entra de novo uma vez.
+- Durante os 30 dias de uma conta excluída, convidados das pastas compartilhadas dela ainda as veem.
+- Post-its não são criptografados (o aviso de excluir conta recomenda gerenciador de senhas).
 - `--experimental-https` do Next é recurso experimental (só para desenvolvimento).
 - Avisos LF/CRLF do git no Windows (inofensivos). `frontend/AGENTS.md` é gerado pelo `next dev`.
 - Firefox/Safari não testados; virada de meia-noite com a página aberta não testada ao vivo.
@@ -144,8 +157,6 @@ Limitações e pontos de atenção:
 1. **Publicar** (sem Oracle): Cloudflare Tunnel para demonstração rápida; para valer, um host com disco
    persistente para o SQLite (Render, Railway, Fly.io) + domínio → HTTPS público sem aviso.
 2. **PWA + notificações push** (alerta com o app fechado; ícone na tela inicial).
-3. **Segurança**: cookie httpOnly para a sessão, limite de tentativas de login, "esqueci minha senha", excluir conta (LGPD), backup do banco.
+3. **Telas de "esqueci minha senha" e "entrar com Google"** (backend pronto; falta SMTP e Client ID).
 4. Alertas também para convidados de pastas compartilhadas; opção de compartilhar com subpastas.
 5. Testes de tela automatizados (Playwright) no PC e no celular + GitHub Actions rodando `npm test` a cada push.
-6. Ideias restantes da lista: tema claro, tamanho de letra/alto contraste, modo foco/Pomodoro, previsão de 5 dias,
-   sons opcionais, exportar post-its (arquivo/PDF), entrar com Google.

@@ -172,7 +172,7 @@ export const BACKGROUND_MODES = [
 // Aceita só chaves conhecidas com valores válidos; o resto é ignorado
 export function validateSettings(body = {}, current) {
   const next = { ...current };
-  const bools = ['showWeather', 'showSeconds', 'clock24h', 'showUpcoming', 'dynamicBackground', 'calmMode', 'softNotes'];
+  const bools = ['showWeather', 'showSeconds', 'clock24h', 'showUpcoming', 'dynamicBackground', 'calmMode', 'softNotes', 'highContrast', 'sounds', 'showFocusTimer'];
   for (const key of bools) {
     if (key in body) {
       if (typeof body[key] !== 'boolean') throw new HttpError(400, `Valor inválido para ${key}.`);
@@ -186,6 +186,11 @@ export function validateSettings(body = {}, current) {
     defaultColor: NOTE_COLORS,
     warmFilter: ['off', 'low', 'high'],
     mobileLayout: ['grid', 'free'], // no celular: grade organizada ou mural livre
+    theme: ['dark', 'light', 'auto'], // fundo preto, claro ou seguir o celular/PC
+    fontScale: [1, 1.15, 1.3, 1.5], // tamanho da letra
+    soundVolume: [0.3, 0.6, 1],
+    focusMinutes: [15, 25, 45, 50], // modo foco (Pomodoro)
+    breakMinutes: [5, 10, 15],
     autoCalmAfter: [0, 30, 60, 120], // minutos de uso até ligar o modo confortável sozinho
   };
   for (const [key, allowed] of Object.entries(enums)) {

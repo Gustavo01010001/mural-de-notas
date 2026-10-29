@@ -5,6 +5,9 @@ import { router } from './routes/index.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
 import './config/db.js';
 import { NoteModel } from './models/noteModel.js';
+import { UserModel } from './models/userModel.js';
+import { SessionModel } from './models/sessionModel.js';
+import { startAutomaticBackups } from './services/backupService.js';
 
 // IPs desta máquina na rede local (Wi-Fi/cabo)
 function lanIPs() {
@@ -33,11 +36,24 @@ app.use(
 // Corpo pequeno para tudo, exceto o envio de foto (imagem já reduzida pelo front, em base64)
 const smallJson = express.json({ limit: '100kb' });
 const imageJson = express.json({ limit: '2.5mb' });
-app.use((req, res, next) => (/\/notes\/\d+\/image$/.test(req.path) ? imageJson : smallJson)(req, res, next));
+const importJson = express.json({ limit: '25mb' }); // backup com fotos
+app.use((req, res, next) =>
+  (/\/notes\/\d+\/image$/.test(req.path) ? imageJson : req.path === '/api/account/import' ? importJson : smallJson)(req, res, next),
+);
 
-// Limpa a lixeira antiga ao iniciar e uma vez por dia
-NoteModel.purgeOldTrash();
-setInterval(() => NoteModel.purgeOldTrash(), 24 * 60 * 60 * 1000).unref();
+// Limpezas diárias: lixeira antiga, contas excluídas há mais de 30 dias e sessões vencidas
+function dailyCleanup() {
+  NoteModel.purgeOldTrash();
+  const purged = UserModel.purgeDeleted();
+  if (purged) console.log(`[contas] ${purged} conta(s) excluída(s) de vez (prazo de 30 dias acabou)`);
+  SessionModel.purgeExpired();
+}
+dailyCleanup();
+setInterval(dailyCleanup, 24 * 60 * 60 * 1000).unref();
+startAutomaticBackups();
+
+// Atrás do proxy do Next: confia no x-forwarded-proto para saber se é HTTPS (cookie Secure)
+app.set('trust proxy', 'loopback');
 
 app.use('/api', router);
 app.use(notFound);
@@ -48,4 +64,5 @@ app.listen(PORT, HOST, () => {
   console.log('  abra o front em:  https://localhost:3000');
   for (const ip of lanIPs()) console.log(`  no celular (mesma rede):  https://${ip}:3000`);
   console.log(`Clima via ${process.env.GOOGLE_WEATHER_API_KEY ? 'Google Weather API' : 'Open-Meteo (sem chave)'}`);
+  console.log(`E-mail: ${process.env.SMTP_HOST ? 'configurado' : 'não configurado (links de senha aparecem aqui)'} · Google: ${process.env.GOOGLE_CLIENT_ID ? 'configurado' : 'não configurado'}`);
 });

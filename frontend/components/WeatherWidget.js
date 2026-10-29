@@ -6,6 +6,7 @@ import Clock, { greeting } from './Clock';
 import WeatherIcon from './WeatherIcon';
 
 const toUnit = (c, unit) => (c == null ? null : unit === 'F' ? (c * 9) / 5 + 32 : c);
+const weekday = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') : '');
 
 export default function WeatherWidget({ weather, error, userName, settings }) {
   const [open, setOpen] = useState(true);
@@ -78,6 +79,29 @@ export default function WeatherWidget({ weather, error, userName, settings }) {
                 <span title="Sensação térmica">🌡 {round(weather.feelsLike)}°</span>
                 <span title="Umidade">💧 {weather.humidity == null ? '--' : Math.round(weather.humidity)}%</span>
                 <span title="Vento">💨 {weather.wind == null ? '--' : Math.round(weather.wind)} km/h</span>
+              </div>
+            )}
+            {weather?.forecast?.length > 1 && (
+              <div className="forecast" aria-label="Previsão dos próximos dias">
+                {weather.forecast.slice(0, 5).map((d, i) => (
+                  <motion.div
+                    key={d.date ?? i}
+                    className="forecast-day"
+                    title={`${d.description}${d.rain != null ? ` · chuva ${d.rain}%` : ''}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                  >
+                    <span className="forecast-name">{i === 0 ? 'Hoje' : weekday(d.date)}</span>
+                    <span className="forecast-icon">
+                      <WeatherIcon condition={d.condition} isDay />
+                    </span>
+                    <span className="forecast-temp">
+                      <b>{round(d.max)}°</b> {round(d.min)}°
+                    </span>
+                    {d.rain != null && d.rain >= 30 && <span className="forecast-rain">💧{d.rain}%</span>}
+                  </motion.div>
+                ))}
               </div>
             )}
             {weather && (

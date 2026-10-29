@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { COLORS } from '@/lib/format';
 import { SCENES, sceneFromWeather, sceneInfo } from '@/lib/scenes';
+import { playSound, setSoundPrefs } from '@/lib/sounds';
+import AccountSection from './AccountSection';
 
 function Toggle({ checked, onChange, label, hint }) {
   return (
@@ -73,6 +75,10 @@ export default function SettingsPanel({
   weather,
   autoCalm,
   onSnoozeAutoCalm,
+  toast,
+  onAuthError,
+  onImported,
+  onDeleted,
 }) {
   const [name, setName] = useState('');
 
@@ -135,6 +141,88 @@ export default function SettingsPanel({
                   </button>
                 </form>
                 <small className="muted">{user?.email}</small>
+              </section>
+
+              <section>
+                <h3>Aparência e acessibilidade</h3>
+                <Segmented
+                  label="Tema"
+                  value={settings.theme}
+                  onChange={set('theme')}
+                  options={[
+                    { id: 'dark', label: '🌙 Escuro' },
+                    { id: 'light', label: '☀️ Claro' },
+                    { id: 'auto', label: '🔄 Auto' },
+                  ]}
+                />
+                <Segmented
+                  label="Tamanho da letra"
+                  value={settings.fontScale}
+                  onChange={set('fontScale')}
+                  options={[
+                    { id: 1, label: 'A' },
+                    { id: 1.15, label: 'A+' },
+                    { id: 1.3, label: 'A++' },
+                    { id: 1.5, label: 'A+++' },
+                  ]}
+                />
+                <Toggle
+                  label="Alto contraste"
+                  hint="Textos e bordas mais fortes, sem transparências. Ajuda quem tem baixa visão."
+                  checked={settings.highContrast}
+                  onChange={set('highContrast')}
+                />
+              </section>
+
+              <section>
+                <h3>Sons e foco</h3>
+                <Toggle
+                  label="Sons suaves"
+                  hint="Ao colar, excluir, completar checklist e nos lembretes."
+                  checked={settings.sounds}
+                  onChange={(v) => {
+                    onChange({ sounds: v });
+                    if (v) setTimeout(() => playSound('pop', { force: true }), 50);
+                  }}
+                />
+                {settings.sounds && (
+                  <Segmented
+                    label="Volume"
+                    value={settings.soundVolume}
+                    onChange={(v) => {
+                      onChange({ soundVolume: v });
+                      setSoundPrefs({ volume: v });
+                      setTimeout(() => playSound('check', { force: true }), 30);
+                    }}
+                    options={[
+                      { id: 0.3, label: 'Baixo' },
+                      { id: 0.6, label: 'Médio' },
+                      { id: 1, label: 'Alto' },
+                    ]}
+                  />
+                )}
+                <Toggle
+                  label="Timer de foco (Pomodoro)"
+                  hint="Um cronômetro discreto no canto: foca, faz uma pausa, repete."
+                  checked={settings.showFocusTimer}
+                  onChange={set('showFocusTimer')}
+                />
+                {settings.showFocusTimer && (
+                  <>
+                    <Segmented
+                      label="Foco"
+                      value={settings.focusMinutes}
+                      onChange={set('focusMinutes')}
+                      options={[15, 25, 45, 50].map((m) => ({ id: m, label: `${m} min` }))}
+                    />
+                    <Segmented
+                      label="Pausa"
+                      value={settings.breakMinutes}
+                      onChange={set('breakMinutes')}
+                      options={[5, 10, 15].map((m) => ({ id: m, label: `${m} min` }))}
+                    />
+                  </>
+                )}
               </section>
 
               <section>
@@ -307,6 +395,8 @@ export default function SettingsPanel({
                   </div>
                 </div>
               </section>
+
+              <AccountSection user={user} toast={toast} onAuthError={onAuthError} onImported={onImported} onDeleted={onDeleted} />
 
               <button className="btn-logout" onClick={onLogout}>
                 Sair da conta

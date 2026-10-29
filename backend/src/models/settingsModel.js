@@ -11,6 +11,15 @@ export const DEFAULT_SETTINGS = {
   effectsIntensity: 'medium',
   defaultColor: 'yellow',
   mobileLayout: 'grid',
+  // Aparência e acessibilidade
+  theme: 'dark',
+  fontScale: 1,
+  highContrast: false,
+  sounds: false,
+  soundVolume: 0.6,
+  showFocusTimer: false,
+  focusMinutes: 25,
+  breakMinutes: 5,
   // Conforto visual
   calmMode: false,
   autoCalmAfter: 0,

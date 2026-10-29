@@ -6,6 +6,7 @@ import { WeatherController } from '../controllers/weatherController.js';
 import { SettingsController } from '../controllers/settingsController.js';
 import { FolderController } from '../controllers/folderController.js';
 import { LiveController } from '../controllers/liveController.js';
+import { AccountController } from '../controllers/accountController.js';
 import { requireAuth } from '../middlewares/auth.js';
 
 export const router = Router();
@@ -13,10 +14,21 @@ export const router = Router();
 router.get('/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // Autenticação / cadastro
+router.get('/auth/config', AuthController.config);
 router.post('/auth/register', AuthController.register);
 router.post('/auth/login', AuthController.login);
+router.post('/auth/google', AuthController.google);
+router.post('/auth/forgot', AuthController.forgot);
+router.post('/auth/reset', AuthController.reset);
 router.get('/auth/me', requireAuth, AuthController.me);
+router.post('/auth/password', requireAuth, AuthController.changePassword);
+router.post('/auth/cookie', requireAuth, AuthController.upgradeToCookie);
 router.post('/auth/logout', requireAuth, AuthController.logout);
+
+// Conta / LGPD: backup, importar e excluir
+router.get('/account/export', requireAuth, AccountController.export);
+router.post('/account/import', requireAuth, AccountController.import);
+router.delete('/account', requireAuth, AccountController.remove);
 
 // Pastas (subpastas, ordem, cor) e compartilhamento
 router.get('/folders', requireAuth, FolderController.list);

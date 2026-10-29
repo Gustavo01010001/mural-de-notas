@@ -184,6 +184,29 @@ Tudo fica salvo no banco (tabela `user_settings`), então vale em qualquer dispo
   - **Ligar sozinho após** 30 min / 1 h / 2 h de uso (com aviso e opção de desligar por agora).
   - **Filtro de luz azul** (leve/forte), **escurecer fundo** (0–70%) e **cores suaves** nos post-its.
 - **Mural:** mostrar/ocultar "Próximas datas" e cor padrão dos novos post-its.
+- **Aparência e acessibilidade:** tema **Escuro / Claro / Automático** (segue o sistema), tamanho da
+  letra (A, A+, A++, A+++) e **alto contraste** (bordas fortes, sem transparência, texto sem cinza).
+- **Sons e foco:** **sons suaves** opcionais ao colar, excluir, desfazer e concluir (com volume) e o
+  **timer de foco (Pomodoro)**: 25 min de foco e 5 de pausa (ajustável), discreto embaixo do mural,
+  com botão ⏱ Foco nas ferramentas. Continua contando se recarregar a página e mostra o tempo na aba.
+- **Clima:** previsão dos **próximos 5 dias** (máx/mín e chance de chuva) dentro do widget.
+
+## 🔐 Conta, segurança e privacidade (LGPD)
+
+- **Login num cookie seguro** (`httpOnly`, `Secure`, `SameSite=Lax`): o JavaScript da página não
+  consegue ler a sessão. No banco fica só o *hash* do token. Pedidos que alteram dados exigem o
+  cabeçalho `X-Mural: 1` (proteção contra CSRF). Quem estava logado pelo jeito antigo é migrado sozinho.
+- **Limite de tentativas:** 8 logins errados em 15 min por e-mail+IP e 10 cadastros por hora por IP.
+- **Trocar ou criar senha** em Configurações → Conta (encerra as sessões dos outros aparelhos).
+- **Baixar backup** (arquivo `.json` com pastas, post-its, fotos e configurações), **Salvar em PDF**
+  (página `/exportar`, pronta para imprimir) e **Importar backup** (não apaga nada, só acrescenta).
+- **Excluir conta:** pede a senha e avisa para baixar o backup antes. A conta fica **30 dias** guardada:
+  se a pessoa entrar de novo nesse prazo, tudo volta como estava; depois disso é apagada de vez.
+  Os post-its **não são criptografados** — o aviso recomenda guardar senhas num gerenciador de senhas.
+- **Backup automático do banco:** uma cópia por dia em `backend/data/backups/` (guarda as 7 últimas;
+  `BACKUP_DISABLED=1` desliga). Essa pasta nunca vai para o GitHub.
+- "Esqueci minha senha" por e-mail e "Entrar com Google" já têm o backend pronto
+  (`SMTP_*`, `GOOGLE_CLIENT_ID` no `.env`), mas **ainda não aparecem na tela** — ficaram para depois.
 
 ## 📱 Responsivo
 
@@ -213,10 +236,17 @@ A chave fica **só no backend**, nunca vai para o navegador.
 
 | Método | Rota                     | O que faz                                  |
 |--------|--------------------------|--------------------------------------------|
-| POST   | `/auth/register`         | Cadastra usuário e devolve token           |
-| POST   | `/auth/login`            | Login                                      |
+| POST   | `/auth/register`         | Cadastra usuário (sessão em cookie)        |
+| POST   | `/auth/login`            | Login (reativa conta excluída há < 30 dias) |
 | GET    | `/auth/me`               | Usuário logado                             |
-| POST   | `/auth/logout`           | Encerra a sessão                           |
+| POST   | `/auth/logout`           | Encerra a sessão e apaga o cookie          |
+| POST   | `/auth/cookie`           | Troca token antigo (localStorage) por cookie |
+| POST   | `/auth/password`         | Troca / cria senha                         |
+| GET    | `/auth/config`           | Diz se e-mail e Google estão configurados  |
+| POST   | `/auth/forgot`, `/auth/reset` | Esqueci minha senha (sem tela ainda)  |
+| GET    | `/account/export`        | Baixa backup em JSON                       |
+| POST   | `/account/import`        | Importa um backup                          |
+| DELETE | `/account`               | Exclui a conta (30 dias para voltar)       |
 | GET    | `/folders`               | Lista pastas (com quantidade de post-its)  |
 | POST   | `/folders`               | Cria pasta (nome + ícone)                  |
 | PUT    | `/folders/:id`           | Renomeia / troca ícone                     |

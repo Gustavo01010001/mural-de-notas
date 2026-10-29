@@ -3,9 +3,9 @@
 // "Ao vivo" numa pasta compartilhada: presença, cursores e aviso de mudanças.
 // Usa fetch + leitura do fluxo (Server-Sent Events) para poder mandar o token no cabeçalho.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getToken } from './api';
+import { API_URL as BASE, SAFE_HEADERS } from './api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_URL = BASE;
 const STALE_MS = 15_000; // cursor parado há muito tempo some
 
 export function useLiveFolder(folderId, enabled, { onNotesChanged, onFolderChanged, onKicked }) {
@@ -33,7 +33,8 @@ export function useLiveFolder(folderId, enabled, { onNotesChanged, onFolderChang
         ctrl = new AbortController();
         try {
           const res = await fetch(`${API_URL}/live/folders/${folderId}`, {
-            headers: { Authorization: `Bearer ${getToken()}`, Accept: 'text/event-stream' },
+            headers: { Accept: 'text/event-stream' },
+            credentials: 'same-origin',
             signal: ctrl.signal,
             cache: 'no-store',
           });
@@ -117,7 +118,7 @@ export function useLiveFolder(folderId, enabled, { onNotesChanged, onFolderChang
         lastSent.current = Date.now();
         fetch(`${API_URL}/live/folders/${folderId}/cursor`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+          headers: { ...SAFE_HEADERS, 'Content-Type': 'application/json' },
           body: JSON.stringify(p),
         }).catch(() => {});
       };

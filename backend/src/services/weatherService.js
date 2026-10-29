@@ -59,8 +59,27 @@ async function fromGoogle(lat, lon, key) {
   const url =
     'https://weather.googleapis.com/v1/currentConditions:lookup' +
     `?key=${encodeURIComponent(key)}&location.latitude=${lat}&location.longitude=${lon}&languageCode=pt-BR`;
-  const d = await getJson(url);
+  const [d, f] = await Promise.all([
+    getJson(url),
+    // previsão de 5 dias (se falhar, o clima de agora continua aparecendo)
+    getJson(
+      'https://weather.googleapis.com/v1/forecast/days:lookup' +
+        `?key=${encodeURIComponent(key)}&location.latitude=${lat}&location.longitude=${lon}&days=5&languageCode=pt-BR`,
+    ).catch(() => null),
+  ]);
+  const forecast = (f?.forecastDays ?? []).slice(0, 5).map((day) => {
+    const dd = day.displayDate ?? {};
+    return {
+      date: dd.year ? `${dd.year}-${String(dd.month).padStart(2, '0')}-${String(dd.day).padStart(2, '0')}` : null,
+      condition: googleCondition(day.daytimeForecast?.weatherCondition?.type),
+      description: day.daytimeForecast?.weatherCondition?.description?.text ?? '',
+      max: day.maxTemperature?.degrees ?? null,
+      min: day.minTemperature?.degrees ?? null,
+      rain: day.daytimeForecast?.precipitation?.probability?.percent ?? null,
+    };
+  });
   return {
+    forecast,
     source: 'google',
     temperature: d.temperature?.degrees ?? null,
     feelsLike: d.feelsLikeTemperature?.degrees ?? null,
@@ -80,11 +99,24 @@ async function fromOpenMeteo(lat, lon) {
     'https://api.open-meteo.com/v1/forecast' +
     `?latitude=${lat}&longitude=${lon}` +
     '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m' +
-    '&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1';
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=5';
   const d = await getJson(url);
   const c = d.current;
   const [condition, description] = WMO[c.weather_code] ?? ['clouds', 'Tempo instável'];
+  const daily = d.daily ?? {};
+  const forecast = (daily.time ?? []).map((date, i) => {
+    const [cond, desc] = WMO[daily.weather_code?.[i]] ?? ['clouds', 'Tempo instável'];
+    return {
+      date,
+      condition: cond,
+      description: desc,
+      max: daily.temperature_2m_max?.[i] ?? null,
+      min: daily.temperature_2m_min?.[i] ?? null,
+      rain: daily.precipitation_probability_max?.[i] ?? null,
+    };
+  });
   return {
+    forecast,
     source: 'open-meteo',
     temperature: c.temperature_2m,
     feelsLike: c.apparent_temperature,

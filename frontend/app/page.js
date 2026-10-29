@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { api, clearToken, getToken } from '@/lib/api';
+import { api, clearSession, hasSession, migrateLegacyToken } from '@/lib/api';
 import { alertHeadline, countdownLabel, eventIcon } from '@/lib/format';
 import { tagColor } from '@/lib/noteHelpers';
 import { useToast } from '@/components/Toasts';
@@ -23,6 +23,9 @@ import { useLiveFolder } from '@/lib/useLiveFolder';
 import { flattenTree } from '@/lib/folderTree';
 import { BoardTools, SelectionBar, ZOOM_MAX, ZOOM_MIN } from '@/components/BoardTools';
 import { useWeather } from '@/lib/useWeather';
+import { applyAppearance } from '@/lib/appearance';
+import { playSound, setSoundPrefs } from '@/lib/sounds';
+import FocusTimer from '@/components/FocusTimer';
 import { resolveScene } from '@/lib/scenes';
 
 const ALERT_POLL_MS = 60 * 1000;
@@ -39,6 +42,14 @@ const DEFAULT_SETTINGS = {
   effectsIntensity: 'medium',
   defaultColor: 'yellow',
   mobileLayout: 'grid',
+  theme: 'dark',
+  fontScale: 1,
+  highContrast: false,
+  sounds: false,
+  soundVolume: 0.6,
+  showFocusTimer: false,
+  focusMinutes: 25,
+  breakMinutes: 5,
   calmMode: false,
   autoCalmAfter: 0,
   warmFilter: 'off',
@@ -209,6 +220,7 @@ export default function BoardPage() {
       if (!notified.current.has(key)) {
         notified.current.add(key);
         notifyBrowser(n);
+        playSound('alert');
       }
     });
     // Virou o dia? Recarrega as contagens dos post-its
@@ -217,12 +229,13 @@ export default function BoardPage() {
   }, [loadNotes]);
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!hasSession()) {
       router.replace('/login');
       return;
     }
     (async () => {
       try {
+        await migrateLegacyToken(); // login antigo (token no navegador) vira cookie seguro
         const { user } = await api('/auth/me');
         setUser(user);
         const [list] = await Promise.all([
@@ -528,6 +541,7 @@ export default function BoardPage() {
         }
         if (targetFolder === currentFolder) {
           setNotes((list) => [...list, created]);
+          playSound('pop');
           toast(data.message, 'success');
         } else {
           toast(`Post-it criado na pasta "${folderName(targetFolder)}".`, 'success');
@@ -551,6 +565,7 @@ export default function BoardPage() {
         label: 'Desfazer',
         onClick: () => {
           if (lastUndo.current === entry) lastUndo.current = null;
+          playSound('undo');
           undo();
         },
       },
@@ -589,6 +604,7 @@ export default function BoardPage() {
   async function handleDelete(note) {
     try {
       await api(`/notes/${note.id}`, { method: 'DELETE' });
+      playSound('delete');
       dropFromBoard([note.id]);
       loadFolders().catch(() => {});
       offerUndo(`"${note.title}" foi para a lixeira.`, async () => {
@@ -640,6 +656,7 @@ export default function BoardPage() {
     try {
       const data = await api(`/notes/${note.id}/duplicate`, { method: 'POST' });
       setNotes((list) => [...list, data.note]);
+      playSound('pop');
       loadFolders().catch(() => {});
       toast(data.message, 'success');
     } catch (err) {
@@ -653,6 +670,7 @@ export default function BoardPage() {
       const data = await api(`/notes/${note.id}/checklist/${itemId}`, { method: 'PATCH', body: { done } });
       replaceNote(data.note);
       const all = data.note.checklist.length > 1 && data.note.checklist.every((i) => i.done);
+      if (done) playSound(all ? 'done' : 'check');
       if (done && all) toast(`Checklist de "${note.title}" completa! 🎉`, 'success');
     } catch (err) {
       replaceNote(note);
@@ -842,7 +860,7 @@ export default function BoardPage() {
     try {
       await api('/auth/logout', { method: 'POST' });
     } catch {}
-    clearToken();
+    clearSession();
     router.replace('/login');
   }
 
@@ -877,6 +895,14 @@ export default function BoardPage() {
   const scene = resolveScene(settings, weather);
   const isDay = weather?.isDay ?? true;
   const calm = settings.calmMode || autoCalm;
+
+  // Tema, tamanho da letra e alto contraste valem para a página inteira; sons seguem as preferências
+  useEffect(() => {
+    applyAppearance({ theme: settings.theme, fontScale: settings.fontScale, highContrast: settings.highContrast });
+  }, [settings.theme, settings.fontScale, settings.highContrast]);
+  useEffect(() => {
+    setSoundPrefs({ enabled: settings.sounds, volume: settings.soundVolume, calm });
+  }, [settings.sounds, settings.soundVolume, calm]);
   const boardClass = [
     'board',
     scene && `has-scene scene-${scene}`,
@@ -1057,6 +1083,8 @@ export default function BoardPage() {
           selecting={selecting}
           onSelectMode={() => setSelection((s) => (s === null ? new Set() : null))}
           showFreeTools={!gridMode}
+          focusOn={settings.showFocusTimer}
+          onFocusTimer={() => handleSettingsChange({ showFocusTimer: !settings.showFocusTimer })}
         />
       )}
 
@@ -1220,7 +1248,29 @@ export default function BoardPage() {
         weather={weather}
         autoCalm={autoCalm}
         onSnoozeAutoCalm={handleSnoozeAutoCalm}
+        toast={toast}
+        onAuthError={handleAuthError}
+        onImported={refreshAll}
+        onDeleted={(msg) => {
+          clearSession();
+          try {
+            sessionStorage.setItem('mural_bye', msg);
+          } catch {}
+          router.replace('/login');
+        }}
       />
+      <AnimatePresence>
+        {user && settings.showFocusTimer && (
+          <FocusTimer
+            key="focus"
+            focusMinutes={settings.focusMinutes}
+            breakMinutes={settings.breakMinutes}
+            calm={calm}
+            toast={toast}
+            onClose={() => handleSettingsChange({ showFocusTimer: false })}
+          />
+        )}
+      </AnimatePresence>
       <AlertModal alerts={alerts} onDismiss={handleDismiss} calm={calm} />
     </main>
   );

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // DB_DIR permite usar outro banco (ex.: os testes automáticos usam uma pasta temporária)
-const dataDir = process.env.DB_DIR
+export const dataDir = process.env.DB_DIR
   ? path.resolve(process.env.DB_DIR)
   : path.resolve(import.meta.dirname, '..', '..', 'data');
 fs.mkdirSync(dataDir, { recursive: true });
@@ -121,5 +121,27 @@ db.exec(`
     mime       TEXT NOT NULL,
     data       BLOB NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Conta: exclusão com 30 dias para se arrepender, login com Google
+const USER_MIGRATIONS = {
+  deleted_at: 'TEXT', // pediu para excluir a conta (apagada de vez depois de 30 dias)
+  google_sub: 'TEXT', // id da conta Google vinculada
+};
+const userColumns = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+for (const [col, type] of Object.entries(USER_MIGRATIONS)) {
+  if (!userColumns.includes(col)) db.exec(`ALTER TABLE users ADD COLUMN ${col} ${type}`);
+}
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
+
+  -- "Esqueci minha senha": guardamos só o hash do código, que vale 30 minutos e uma vez só
+  CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT
   );
 `);

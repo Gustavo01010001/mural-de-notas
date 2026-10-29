@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { api, getToken, setToken } from '@/lib/api';
+import { api, hasSession, markLoggedIn } from '@/lib/api';
+import { applyCachedAppearance } from '@/lib/appearance';
 import { useToast } from './Toasts';
 
 const FLOATING = [
@@ -23,7 +24,15 @@ export default function AuthForm({ mode }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (getToken()) router.replace('/');
+    applyCachedAppearance();
+    try {
+      const bye = sessionStorage.getItem('mural_bye');
+      if (bye) {
+        sessionStorage.removeItem('mural_bye');
+        toast(bye, 'info', { duration: 12000 });
+      }
+    } catch {}
+    if (hasSession()) router.replace('/');
   }, [router]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -38,7 +47,7 @@ export default function AuthForm({ mode }) {
         method: 'POST',
         body: isRegister ? form : { email: form.email, password: form.password },
       });
-      setToken(data.token);
+      markLoggedIn(); // a sessão em si fica num cookie seguro que o back criou
       toast(data.message, 'success');
       router.replace('/');
     } catch (err) {

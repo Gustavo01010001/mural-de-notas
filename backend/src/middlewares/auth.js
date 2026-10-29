@@ -50,7 +50,7 @@ export function requireAuth(req, _res, next) {
   }
   const user = token ? SessionModel.findUserByToken(token) : null;
   if (!user) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
-  req.user = { id: user.id, name: user.name, email: user.email, created_at: user.created_at, hasGoogle: Boolean(user.has_google), hasPassword: Boolean(user.has_password) };
+  req.user = { id: user.id, name: user.name, email: user.email, code: user.public_code, created_at: user.created_at, hasGoogle: Boolean(user.has_google), hasPassword: Boolean(user.has_password) };
   req.token = token;
   next();
 }

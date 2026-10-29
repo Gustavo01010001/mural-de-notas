@@ -7,6 +7,7 @@ import { SCENES, sceneFromWeather, sceneInfo } from '@/lib/scenes';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
 import AccountSection from './AccountSection';
 import Icon from './Icon';
+import MyCode from './MyCode';
 
 function Toggle({ checked, onChange, label, hint }) {
   return (
@@ -148,6 +149,7 @@ export default function SettingsPanel({
                   </button>
                 </form>
                 <small className="muted">{user?.email}</small>
+                <MyCode code={user?.code} toast={toast} />
               </section>
 
               <section>

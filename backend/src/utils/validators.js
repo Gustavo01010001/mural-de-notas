@@ -1,5 +1,6 @@
 import { HttpError } from './httpError.js';
 import { isValidDate, isValidTime, REPEATS } from './dates.js';
+import { normalizePublicCode } from './publicCode.js';
 
 export const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green', 'orange', 'purple'];
 export const EVENT_TYPES = ['birthday', 'event', 'reminder'];
@@ -241,6 +242,15 @@ export function validateInviteEmail(body = {}) {
   const email = String(body.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Digite um e-mail válido.');
   return email;
+}
+
+// Convite: a pessoa digita o ID (ex.: K7P2-9QXM) ou o e-mail no mesmo campo ("who")
+export function validateInvite(body = {}) {
+  const who = String(body.who ?? body.code ?? body.email ?? '').trim();
+  if (who.includes('@')) return { email: validateInviteEmail({ email: who }) };
+  const code = normalizePublicCode(who);
+  if (!code) throw new HttpError(400, 'Digite o ID da pessoa (ex.: K7P2-9QXM) ou o e-mail dela.');
+  return { code };
 }
 
 // "root", vazio ou null = Mural geral; senão o id da pasta

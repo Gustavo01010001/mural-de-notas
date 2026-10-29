@@ -3,6 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { generatePublicCode } from '../utils/publicCode.js';
 
 // DB_DIR permite usar outro banco (ex.: os testes automáticos usam uma pasta temporária)
 export const dataDir = process.env.DB_DIR
@@ -128,6 +129,7 @@ db.exec(`
 const USER_MIGRATIONS = {
   deleted_at: 'TEXT', // pediu para excluir a conta (apagada de vez depois de 30 dias)
   google_sub: 'TEXT', // id da conta Google vinculada
+  public_code: 'TEXT', // ID para convidar sem o e-mail (ex.: K7P2-9QXM)
 };
 const userColumns = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
 for (const [col, type] of Object.entries(USER_MIGRATIONS)) {
@@ -136,6 +138,7 @@ for (const [col, type] of Object.entries(USER_MIGRATIONS)) {
 
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_code ON users(public_code) WHERE public_code IS NOT NULL;
 
   -- "Esqueci minha senha": guardamos só o hash do código, que vale 30 minutos e uma vez só
   CREATE TABLE IF NOT EXISTS password_resets (
@@ -145,3 +148,17 @@ db.exec(`
     used_at    TEXT
   );
 `);
+
+// Contas antigas (de antes do ID público) ganham o seu na primeira vez que o servidor sobe
+{
+  const missing = db.prepare('SELECT id FROM users WHERE public_code IS NULL').all();
+  const setCode = db.prepare('UPDATE users SET public_code = ? WHERE id = ?');
+  for (const { id } of missing) {
+    for (;;) {
+      try {
+        setCode.run(generatePublicCode(), id);
+        break;
+      } catch {} // colisão (raríssima): tenta outro
+    }
+  }
+}

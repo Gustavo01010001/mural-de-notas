@@ -4,7 +4,8 @@ import { UserModel } from '../models/userModel.js';
 import { folderAccess, ownFolderOr404 } from '../services/accessService.js';
 import { live } from '../services/liveService.js';
 import { HttpError } from '../utils/httpError.js';
-import { parseId, validateFolder, validateInviteEmail, validateReorder } from '../utils/validators.js';
+import { parseId, validateFolder, validateInvite, validateReorder } from '../utils/validators.js';
+import { hit } from '../utils/rateLimit.js';
 
 function ensureUniqueName(userId, name, parentId, exceptId = null) {
   const found = FolderModel.findByName(userId, name, parentId);
@@ -81,9 +82,8 @@ export const FolderController = {
     const access = folderAccess(req.user.id, req.params.id);
     if (!access.folder) throw new HttpError(404, 'Pasta não encontrada.');
     const owner = UserModel.findById(access.ownerId);
-    const isOwner = access.role === 'owner';
-    // só o dono vê os e-mails
-    const strip = (u) => ({ id: u.id, name: u.name, ...(isOwner ? { email: u.email } : {}) });
+    // ninguém vê o e-mail de ninguém aqui: quem convidou pelo ID não precisa (nem deve) saber o e-mail
+    const strip = (u) => ({ id: u.id, name: u.name, code: u.code ?? null });
     res.json({
       role: access.role,
       owner: strip(owner),
@@ -93,17 +93,26 @@ export const FolderController = {
 
   addMember(req, res) {
     const { folder } = ownFolderOr404(req.user.id, req.params.id);
-    const email = validateInviteEmail(req.body);
-    const invited = UserModel.findByEmail(email);
+    // muitos convites seguidos = alguém tentando adivinhar IDs
+    hit(`invite:${req.user.id}`, { max: 30, windowMs: 10 * 60_000, message: 'Muitos convites seguidos. Espere alguns minutos e tente de novo.' });
+    const { email, code } = validateInvite(req.body);
+    const invited = email ? UserModel.findByEmail(email) : UserModel.findByCode(code);
     // mesma mensagem se não existe: não revela quem tem conta
-    if (!invited) throw new HttpError(404, 'Não achei ninguém com esse e-mail. A pessoa precisa ter uma conta no Mural.');
+    if (!invited) {
+      throw new HttpError(
+        404,
+        email
+          ? 'Não achei ninguém com esse e-mail. A pessoa precisa ter uma conta no Mural.'
+          : 'Não achei ninguém com esse ID. Confira se copiou certinho (ex.: K7P2-9QXM).',
+      );
+    }
     if (invited.id === req.user.id) throw new HttpError(400, 'Essa pasta já é sua 🙂');
     if (FolderModel.isMember(folder.id, invited.id)) throw new HttpError(409, `${invited.name} já participa desta pasta.`);
     if (FolderModel.members(folder.id).length >= MAX_MEMBERS) {
       throw new HttpError(400, `Uma pasta pode ser compartilhada com até ${MAX_MEMBERS} pessoas.`);
     }
     FolderModel.addMember(folder.id, invited.id);
-    res.status(201).json({ message: `Pasta compartilhada com ${invited.name}!`, member: { id: invited.id, name: invited.name, email } });
+    res.status(201).json({ message: `Pasta compartilhada com ${invited.name}!`, member: { id: invited.id, name: invited.name, code: invited.code } });
   },
 
   // Dono tira alguém, ou o próprio convidado sai da pasta

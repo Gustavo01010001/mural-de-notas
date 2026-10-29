@@ -12,10 +12,10 @@ const initials = (name) =>
     .map((p) => p[0]?.toUpperCase())
     .join('');
 
-// Quem participa de uma pasta + convidar por e-mail (dono) ou sair da pasta (convidado)
+// Quem participa de uma pasta + convidar pelo ID ou e-mail (dono) ou sair da pasta (convidado)
 export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toast, onAuthError }) {
   const [info, setInfo] = useState(null);
-  const [email, setEmail] = useState('');
+  const [who, setWho] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -30,7 +30,7 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
 
   useEffect(() => {
     setInfo(null);
-    setEmail('');
+    setWho('');
     setError('');
     load();
   }, [load]);
@@ -47,9 +47,9 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
     setError('');
     setSending(true);
     try {
-      const data = await api(`/folders/${folder.id}/members`, { method: 'POST', body: { email } });
+      const data = await api(`/folders/${folder.id}/members`, { method: 'POST', body: { who } });
       toast(data.message, 'success');
-      setEmail('');
+      setWho('');
       await load();
       onChanged();
     } catch (err) {
@@ -108,17 +108,28 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
               </p>
 
               {isOwner && (
-                <form className="share-invite" onSubmit={invite}>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="E-mail da pessoa (ela precisa ter conta)"
-                    autoFocus
-                  />
-                  <button className="btn-small" disabled={!email.trim() || sending}>
-                    {sending ? '...' : 'Convidar'}
-                  </button>
+                <form className="share-invite-form" onSubmit={invite}>
+                  <label htmlFor="share-who">Convidar alguém</label>
+                  <div className="share-invite">
+                    <input
+                      id="share-who"
+                      value={who}
+                      onChange={(e) => (setWho(e.target.value), setError(''))}
+                      placeholder="ID (ex.: K7P2-9QXM) ou e-mail"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      aria-describedby="share-who-hint"
+                      aria-invalid={Boolean(error)}
+                      autoFocus
+                    />
+                    <button className="btn-small" disabled={!who.trim() || sending}>
+                      {sending ? '...' : 'Convidar'}
+                    </button>
+                  </div>
+                  <small id="share-who-hint" className="share-who-hint">
+                    A pessoa acha o ID dela em <b>Configurações → Perfil</b> e te manda. Ela precisa ter conta no Mural.
+                  </small>
                 </form>
               )}
               {error && <p className="auth-error">{error}</p>}
@@ -132,7 +143,7 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
                     </span>
                     <span className="share-name">
                       {info.owner.name} {info.owner.id === me?.id && <em>(você)</em>}
-                      {info.owner.email && <small>{info.owner.email}</small>}
+                      {info.owner.code && <small className="share-code">ID {info.owner.code}</small>}
                     </span>
                     <span className="share-role">Dono</span>
                   </li>
@@ -142,7 +153,7 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
                     <span className="avatar">{initials(m.name)}</span>
                     <span className="share-name">
                       {m.name} {m.id === me?.id && <em>(você)</em>}
-                      {m.email && <small>{m.email}</small>}
+                      {m.code && <small className="share-code">ID {m.code}</small>}
                     </span>
                     {isOwner ? (
                       <button type="button" className="btn-ghost-light small" onClick={() => remove(m.id)}>

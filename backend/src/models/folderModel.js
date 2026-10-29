@@ -156,7 +156,7 @@ export const FolderModel = {
   members(folderId) {
     return db
       .prepare(
-        `SELECT u.id, u.name, u.email, m.added_at FROM folder_members m JOIN users u ON u.id = m.user_id
+        `SELECT u.id, u.name, u.email, u.public_code AS code, m.added_at FROM folder_members m JOIN users u ON u.id = m.user_id
           WHERE m.folder_id = ? ORDER BY m.added_at ASC`,
       )
       .all(folderId);

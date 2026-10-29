@@ -17,7 +17,7 @@ export const SessionModel = {
   findUserByToken(token) {
     return db
       .prepare(
-        `SELECT u.id, u.name, u.email, u.created_at, u.google_sub IS NOT NULL AS has_google, u.password_hash != '!' AS has_password
+        `SELECT u.id, u.name, u.email, u.public_code, u.created_at, u.google_sub IS NOT NULL AS has_google, u.password_hash != '!' AS has_password
            FROM sessions s JOIN users u ON u.id = s.user_id
           WHERE s.token = ? AND s.expires_at > ? AND u.deleted_at IS NULL`,
       )

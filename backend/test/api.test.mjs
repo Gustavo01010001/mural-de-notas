@@ -1070,3 +1070,63 @@ describe('Robustez e segurança básica', () => {
     assert.equal((await call('/weather?lat=abc&lon=1')).status, 400);
   });
 });
+
+describe('Convidar pelo ID da pessoa', () => {
+  const CODE_RE = /^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/;
+  let dona, amigo, folder;
+
+  before(async () => {
+    dona = await newUser('Carla');
+    amigo = await newUser('Davi');
+    folder = (await call('/folders', { method: 'POST', token: dona.token, body: { name: 'Projeto TCC', icon: '📚' } })).data.folder;
+  });
+
+  test('cada conta nasce com um ID próprio, que aparece no perfil', async () => {
+    assert.match(dona.user.code, CODE_RE);
+    assert.match(amigo.user.code, CODE_RE);
+    assert.notEqual(dona.user.code, amigo.user.code);
+    const me = (await call('/auth/me', { token: dona.token })).data.user;
+    assert.equal(me.code, dona.user.code);
+  });
+
+  test('convida pelo ID mesmo colado em minúsculas, sem hífen ou com espaços', async () => {
+    const colado = ` ${amigo.user.code.replace('-', '').toLowerCase()} `;
+    const r = await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: colado } });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    assert.equal(r.data.member.name, 'Davi');
+    assert.equal(r.data.member.code, amigo.user.code);
+    assert.ok(!('email' in r.data.member), 'quem convidou pelo ID não recebe o e-mail');
+
+    const shared = (await call('/folders', { token: amigo.token })).data.shared;
+    assert.ok(shared.some((f) => f.id === folder.id));
+    // de novo: já participa
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: amigo.user.code } })).status, 409);
+  });
+
+  test('ID inválido, inexistente ou o próprio ID dão mensagens claras', async () => {
+    const r1 = await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: 'abc' } });
+    assert.equal(r1.status, 400);
+    assert.match(r1.data.error, /ID/);
+    // formato certo, mas ninguém tem (o alfabeto não tem 0, O, 1, I nem L)
+    const fake = dona.user.code === 'ZZZZ-ZZZZ' ? 'YYYY-YYYY' : 'ZZZZ-ZZZZ';
+    const r2 = await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: fake } });
+    assert.equal(r2.status, 404);
+    assert.match(r2.data.error, /ID/);
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: dona.user.code } })).status, 400);
+    // e-mail no mesmo campo continua valendo
+    const outro = await newUser('Eva');
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: outro.email } })).status, 201);
+  });
+
+  test('lista de participantes mostra nome e ID, nunca o e-mail (nem para a dona)', async () => {
+    for (const token of [dona.token, amigo.token]) {
+      const m = (await call(`/folders/${folder.id}/members`, { token })).data;
+      assert.equal(m.owner.code, dona.user.code);
+      assert.ok(!('email' in m.owner));
+      for (const p of m.members) {
+        assert.match(p.code, CODE_RE);
+        assert.ok(!('email' in p));
+      }
+    }
+  });
+});

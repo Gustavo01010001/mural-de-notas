@@ -1230,3 +1230,13 @@ html.theme-light .my-code {
 .trash-meta .ic {
   vertical-align: -2px;
 }
+
+/* =====================================================================
+   Tema claro: "dobrinha" do canto do post-it sem a mancha cinza
+   (no escuro, a metade escura imita o fundo atrás da dobra; no claro ela
+   aparecia como um quadrado cinza saindo pela curva do papel)
+   ===================================================================== */
+html.theme-light .postit::after {
+  background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.55) 50%);
+  filter: drop-shadow(1px -1px 1.5px rgba(80, 60, 0, 0.18));
+}

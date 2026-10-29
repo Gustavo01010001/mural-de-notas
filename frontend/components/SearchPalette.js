@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { highlight, snippet } from '@/lib/highlight';
 import { COLORS, countdownLabel, eventIcon } from '@/lib/format';
 import { tagColor } from '@/lib/noteHelpers';
+import Icon from './Icon';
 
 const RECENT_KEY = 'mural_recent_searches';
 const EMPTY_FILTERS = { color: null, folder: undefined, tag: null, hasDate: false };
@@ -147,7 +148,7 @@ export default function SearchPalette({ open, onClose, onPick, folders = [] }) {
                 aria-expanded={showFilters}
                 title="Filtros"
               >
-                ⚙︎ Filtros{activeFilters ? ` (${activeFilters})` : ''}
+                <Icon name="sliders" size={15} /> Filtros{activeFilters ? ` (${activeFilters})` : ''}
               </button>
               {loading ? <span className="search-spinner" /> : <kbd>Esc</kbd>}
             </div>
@@ -202,7 +203,7 @@ export default function SearchPalette({ open, onClose, onPick, folders = [] }) {
                   <div className="sf-row">
                     <label className="sf-check">
                       <input type="checkbox" checked={filters.hasDate} onChange={(e) => set({ hasDate: e.target.checked })} />
-                      📅 Só os que têm data
+                      <Icon name="calendar" size={14} /> Só os que têm data
                     </label>
                     {activeFilters > 0 && (
                       <button type="button" className="btn-text" onClick={() => setFilters(EMPTY_FILTERS)}>
@@ -222,7 +223,7 @@ export default function SearchPalette({ open, onClose, onPick, folders = [] }) {
                       <span>Buscas recentes</span>
                       {recent.map((r) => (
                         <button key={r} type="button" onClick={() => (setQuery(r), inputRef.current?.focus())}>
-                          🕘 {r}
+                          <Icon name="clock" size={13} /> {r}
                         </button>
                       ))}
                       <button

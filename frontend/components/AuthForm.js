@@ -8,11 +8,12 @@ import { api, hasSession, markLoggedIn } from '@/lib/api';
 import { applyCachedAppearance } from '@/lib/appearance';
 import { useToast } from './Toasts';
 
+// os da direita ficam presos pela direita, para nunca saírem da tela
 const FLOATING = [
   { color: 'yellow', text: 'Comprar pão 🥖', x: '8%', y: '14%', r: -8 },
-  { color: 'pink', text: 'Niver da Ana 🎂', x: '78%', y: '18%', r: 6 },
+  { color: 'pink', text: 'Niver da Ana 🎂', right: '7%', y: '18%', r: 6 },
   { color: 'blue', text: 'Estudar Next.js', x: '12%', y: '72%', r: 5 },
-  { color: 'green', text: 'Academia 💪', x: '80%', y: '70%', r: -6 },
+  { color: 'green', text: 'Academia 💪', right: '9%', y: '70%', r: -6 },
 ];
 
 export default function AuthForm({ mode }) {
@@ -65,7 +66,7 @@ export default function AuthForm({ mode }) {
         <motion.div
           key={f.text}
           className={`floating-note postit-${f.color}`}
-          style={{ left: f.x, top: f.y }}
+          style={{ left: f.x, right: f.right, top: f.y }}
           initial={{ opacity: 0, scale: 0.5, rotate: f.r }}
           animate={{ opacity: 0.85, scale: 1, rotate: [f.r, -f.r, f.r], y: [0, -16, 0] }}
           transition={{

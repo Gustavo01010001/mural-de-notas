@@ -461,7 +461,7 @@ a {
 .note-modal textarea {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 2px solid transparent;
   background: rgba(255, 255, 255, 0.55);
   color: #222;
@@ -677,7 +677,7 @@ a {
   width: 290px;
   padding: 16px 18px;
   user-select: none;
-  border-radius: 22px;
+  border-radius: 20px;
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(16px);
   overflow: hidden;
@@ -1035,7 +1035,7 @@ a {
   z-index: 2;
   width: min(400px, 100%);
   padding: 34px 30px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: rgba(20, 20, 28, 0.75);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(18px);
@@ -1102,7 +1102,7 @@ a {
 .auth-error {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(224, 49, 49, 0.15);
   border: 1px solid rgba(224, 49, 49, 0.4);
   color: #ffa8a8;
@@ -1146,7 +1146,7 @@ a {
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 14px;
+  border-radius: 16px;
   color: var(--text);
   background: var(--glass);
   border: 1px solid var(--glass-border);
@@ -1223,7 +1223,7 @@ a {
 .icon-btn {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: transparent;
   color: var(--text);
@@ -1269,7 +1269,7 @@ a {
   flex: 1;
   min-width: 0;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
@@ -1283,7 +1283,7 @@ a {
 .btn-small {
   padding: 0 14px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-weight: 600;
   color: #1a1a1a;
   background: var(--accent);
@@ -1380,7 +1380,7 @@ input:focus-visible + .switch {
 .segmented-pill {
   position: absolute;
   inset: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--accent);
 }
 
@@ -1409,7 +1409,7 @@ input:focus-visible + .switch {
   align-items: center;
   gap: 4px;
   padding: 10px 6px;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -1639,7 +1639,7 @@ input:focus-visible + .switch {
 .set-note {
   margin: 4px 0 8px;
   padding: 9px 11px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--muted);
   font-size: 0.78rem;
@@ -1714,7 +1714,7 @@ input:focus-visible + .switch {
   height: 46px;
   max-width: 280px;
   padding: 0 12px 0 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   color: var(--text);
   background: var(--glass);
   border: 1px solid var(--glass-border);
@@ -1773,7 +1773,7 @@ input:focus-visible + .switch {
   display: flex;
   flex-direction: column;
   padding: 10px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(18, 18, 26, 0.96);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(20px);
@@ -1902,7 +1902,7 @@ input:focus-visible + .switch {
 .folder-editor {
   margin-top: 6px;
   padding: 10px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
 }
@@ -1921,7 +1921,7 @@ input:focus-visible + .switch {
   flex: 1;
   min-width: 0;
   padding: 9px 11px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: rgba(0, 0, 0, 0.3);
   color: var(--text);
@@ -1988,7 +1988,7 @@ input:focus-visible + .switch {
   flex: 1;
   max-width: 230px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 2px solid transparent;
   background: rgba(255, 255, 255, 0.55);
   color: #222;
@@ -2050,7 +2050,7 @@ input:focus-visible + .switch {
 
 .search-input kbd {
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--glass-border);
   font-size: 0.7rem;
   font-family: inherit;
@@ -2136,7 +2136,7 @@ input:focus-visible + .switch {
 .search-text mark {
   background: rgba(255, 216, 77, 0.25);
   color: var(--accent);
-  border-radius: 3px;
+  border-radius: 8px;
   padding: 0 1px;
 }
 
@@ -2191,7 +2191,7 @@ button.upcoming-item {
   background: none;
   color: var(--text);
   text-align: left;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 button.upcoming-item:hover {
@@ -2379,7 +2379,7 @@ button.upcoming-item:hover {
   right: 8px;
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 2px solid rgba(0, 0, 0, 0.45);
   background: rgba(255, 255, 255, 0.6);
   display: grid;
@@ -2406,7 +2406,7 @@ button.upcoming-item:hover {
   width: 100%;
   max-height: 150px;
   margin: 2px 0 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   pointer-events: none;
@@ -2480,7 +2480,7 @@ button.upcoming-item:hover {
   width: 16px;
   height: 16px;
   margin-top: 1px;
-  border-radius: 5px;
+  border-radius: 8px;
   border: 2px solid rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
@@ -2605,7 +2605,7 @@ button.upcoming-item:hover {
   align-items: center;
   gap: 6px;
   padding: 6px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.55);
 }
 
@@ -2643,7 +2643,7 @@ button.upcoming-item:hover {
 .image-pick {
   padding: 12px;
   border: 2px dashed rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.35);
   color: #333;
 }
@@ -2700,7 +2700,7 @@ button.upcoming-item:hover {
   gap: 6px;
   padding: 9px 8px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--muted);
   font-size: 0.85rem;
@@ -2891,7 +2891,7 @@ button.upcoming-item:hover {
 .sel-move select {
   height: 36px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
@@ -2976,7 +2976,7 @@ button.upcoming-item:hover {
   flex-shrink: 0;
   padding: 7px 14px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--accent);
   color: #1a1a1a;
   font-weight: 700;
@@ -3137,7 +3137,7 @@ button.upcoming-item:hover {
     right: 12px;
     width: auto;
     padding: 12px 14px;
-    border-radius: 18px;
+    border-radius: 16px;
   }
 
   .weather-icon {
@@ -3214,7 +3214,7 @@ button.upcoming-item:hover {
     max-height: 88vh;
     border-left: none;
     border-top: 1px solid var(--glass-border);
-    border-radius: 22px 22px 0 0;
+    border-radius: 20px 20px 0 0;
   }
 
   .drawer-head::before {
@@ -3225,7 +3225,7 @@ button.upcoming-item:hover {
     width: 40px;
     height: 4px;
     margin-left: -20px;
-    border-radius: 4px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.25);
   }
 

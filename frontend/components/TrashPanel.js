@@ -4,15 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { daysLeftInTrash } from '@/lib/noteHelpers';
+import Icon from './Icon';
 
 const MODES = {
   trash: {
-    title: '🗑️ Lixeira',
+    title: 'Lixeira',
+    icon: 'trash',
     empty: 'A lixeira está vazia. Post-its excluídos ficam aqui por 30 dias.',
     endpoint: '/notes/trash',
   },
   archive: {
-    title: '📦 Arquivados',
+    title: 'Arquivados',
+    icon: 'archive',
     empty: 'Nenhum post-it arquivado. Arquive o que já foi resolvido para limpar o mural sem apagar.',
     endpoint: '/notes/archived',
   },
@@ -73,7 +76,9 @@ export default function TrashPanel({ mode, onClose, folders, onChanged, toast, o
             transition={{ type: 'spring', stiffness: 300, damping: 28 }}
           >
             <header className="trash-head">
-              <h2>{cfg.title}</h2>
+              <h2>
+                <Icon name={cfg.icon} size={20} /> {cfg.title}
+              </h2>
               {mode === 'trash' && notes?.length > 0 && (
                 <button
                   type="button"
@@ -84,7 +89,7 @@ export default function TrashPanel({ mode, onClose, folders, onChanged, toast, o
                 </button>
               )}
               <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar">
-                ✕
+                <Icon name="x" size={18} />
               </button>
             </header>
 

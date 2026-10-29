@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { countdownLabel, eventIcon, formatEventDate, googleCalendarUrl, repeatLabel } from '@/lib/format';
 import { linkify, tagColor } from '@/lib/noteHelpers';
 import { noteImageUrl } from '@/lib/api';
+import Icon from './Icon';
 
 // Elementos dentro do post-it que não devem começar um arrasto
 const INTERACTIVE = 'button, input, a, label, .resize-handle, .postit-menu';
@@ -233,8 +234,8 @@ export default function PostIt({
 
       {!selecting && (
         <div className={`postit-actions ${menuOpen ? 'open' : ''}`}>
-          <button type="button" className="hover-only" onClick={() => onEdit(note)} aria-label="Editar">
-            ✏️
+          <button type="button" className="hover-only" onClick={() => onEdit(note)} aria-label="Editar" title="Editar">
+            <Icon name="edit" size={15} />
           </button>
           <button
             type="button"
@@ -243,11 +244,11 @@ export default function PostIt({
             aria-label={note.pinned ? 'Desafixar' : 'Fixar no topo'}
             title={note.pinned ? 'Desafixar' : 'Fixar no topo'}
           >
-            📌
+            <Icon name="pin" size={15} />
           </button>
           <div className="postit-menu" ref={menuRef}>
-            <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="Mais ações" aria-expanded={menuOpen}>
-              ⋯
+            <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="Mais ações" aria-expanded={menuOpen} title="Mais ações">
+              <Icon name="more" size={16} />
             </button>
             <AnimatePresence>
               {menuOpen && (
@@ -260,16 +261,16 @@ export default function PostIt({
                 >
                   {[
                     // no toque não há "passar o mouse": editar e fixar moram aqui
-                    ['✏️', 'Editar', () => onEdit(note), 'touch-only'],
-                    ['📌', note.pinned ? 'Desafixar' : 'Fixar no topo', () => onPin(note), 'touch-only'],
-                    ['📄', 'Duplicar', () => onDuplicate(note)],
-                    ['📁', 'Mover para pasta…', () => onSelect(note.id)],
+                    ['edit', 'Editar', () => onEdit(note), 'touch-only'],
+                    ['pin', note.pinned ? 'Desafixar' : 'Fixar no topo', () => onPin(note), 'touch-only'],
+                    ['copy', 'Duplicar', () => onDuplicate(note)],
+                    ['folder', 'Mover para pasta…', () => onSelect(note.id)],
                     ...(note.eventDate
-                      ? [['🗓️', 'Google Agenda', () => window.open(googleCalendarUrl(note), '_blank', 'noopener,noreferrer')]]
+                      ? [['calendar', 'Google Agenda', () => window.open(googleCalendarUrl(note), '_blank', 'noopener,noreferrer')]]
                       : []),
-                    ['☑️', 'Selecionar', () => onSelect(note.id)],
-                    ['📦', 'Arquivar', () => onArchive(note)],
-                    ['🗑️', 'Excluir', () => onDelete(note), 'danger'],
+                    ['checkSquare', 'Selecionar', () => onSelect(note.id)],
+                    ['archive', 'Arquivar', () => onArchive(note)],
+                    ['trash', 'Excluir', () => onDelete(note), 'danger'],
                   ].map(([icon, label, fn, cls]) => (
                     <button
                       key={label}
@@ -280,7 +281,7 @@ export default function PostIt({
                         fn();
                       }}
                     >
-                      <span>{icon}</span> {label}
+                      <Icon name={icon} size={16} /> {label}
                     </button>
                   ))}
                 </motion.div>

@@ -66,7 +66,7 @@ span.folder-chevron.placeholder {
   flex-shrink: 0;
   width: 4px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: 8px;
   margin-right: -2px;
 }
 
@@ -147,7 +147,7 @@ span.folder-chevron.placeholder {
   flex: 1;
   min-width: 0;
   padding: 7px 9px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--glass-border);
   background: rgba(0, 0, 0, 0.3);
   color: var(--text);
@@ -196,7 +196,7 @@ span.folder-chevron.placeholder {
   flex: 1;
   min-width: 0;
   padding: 11px 12px;
-  border-radius: 11px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
@@ -282,7 +282,7 @@ span.folder-chevron.placeholder {
   align-items: center;
   height: 46px;
   padding: 0 12px 0 10px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(14px);
@@ -374,7 +374,7 @@ span.folder-chevron.placeholder {
   align-items: center;
   gap: 5px;
   padding: 8px 12px;
-  border-radius: 11px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid transparent;
   border-left: 4px solid var(--fc, rgba(255, 255, 255, 0.2));
@@ -580,7 +580,7 @@ span.folder-chevron.placeholder {
 .search-filter-toggle {
   flex-shrink: 0;
   padding: 6px 10px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--glass-border);
   background: transparent;
   color: var(--muted);
@@ -724,7 +724,7 @@ span.folder-chevron.placeholder {
   }
 
   .calendar-day {
-    border-radius: 9px;
+    border-radius: 8px;
   }
 
   .sf-row > span:first-child {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import Icon from './Icon';
 
 export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 1.6;
@@ -9,14 +10,14 @@ export const ZOOM_MAX = 1.6;
 function ZoomControl({ zoom, onZoom, className = '' }) {
   return (
     <div className={`zoom-control ${className}`} role="group" aria-label="Zoom do mural">
-      <button type="button" onClick={() => onZoom(zoom - 0.1)} disabled={zoom <= ZOOM_MIN + 0.001} aria-label="Diminuir zoom">
-        −
+      <button type="button" onClick={() => onZoom(zoom - 0.1)} disabled={zoom <= ZOOM_MIN + 0.001} aria-label="Diminuir zoom" title="Diminuir zoom">
+        <Icon name="minus" size={16} />
       </button>
       <button type="button" className="zoom-value" onClick={() => onZoom(1)} title="Voltar para 100%">
         {Math.round(zoom * 100)}%
       </button>
-      <button type="button" onClick={() => onZoom(zoom + 0.1)} disabled={zoom >= ZOOM_MAX - 0.001} aria-label="Aumentar zoom">
-        +
+      <button type="button" onClick={() => onZoom(zoom + 0.1)} disabled={zoom >= ZOOM_MAX - 0.001} aria-label="Aumentar zoom" title="Aumentar zoom">
+        <Icon name="plus" size={16} />
       </button>
     </div>
   );
@@ -47,9 +48,9 @@ export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, s
   };
 
   const items = [
-    showFreeTools && hasNotes && { icon: '▦', label: arranging ? 'Arrumando…' : 'Arrumar em grade', hint: 'Organiza os post-its lado a lado', fn: onArrange, disabled: arranging },
-    hasNotes && { icon: '☑', label: selecting ? 'Cancelar seleção' : 'Selecionar vários', hint: 'Mover, arquivar ou excluir de uma vez', fn: onSelectMode },
-    { icon: '⏱', label: focusOn ? 'Esconder timer de foco' : 'Timer de foco', hint: 'Pomodoro: foco e pausa', fn: onFocusTimer },
+    showFreeTools && hasNotes && { icon: 'grid', label: arranging ? 'Arrumando…' : 'Arrumar em grade', hint: 'Organiza os post-its lado a lado', fn: onArrange, disabled: arranging },
+    hasNotes && { icon: 'checkSquare', label: selecting ? 'Cancelar seleção' : 'Selecionar vários', hint: 'Mover, arquivar ou excluir de uma vez', fn: onSelectMode },
+    { icon: 'timer', label: focusOn ? 'Esconder timer de foco' : 'Timer de foco', hint: 'Pomodoro: foco e pausa', fn: onFocusTimer },
   ].filter(Boolean);
 
   return (
@@ -65,7 +66,7 @@ export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, s
           aria-haspopup="menu"
           title="Mais ferramentas"
         >
-          ⋯ <span className="tool-label">Mais</span>
+          <Icon name="more" size={18} /> <span className="tool-label">Mais</span>
         </button>
         <AnimatePresence>
           {open && (
@@ -80,7 +81,9 @@ export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, s
               {showFreeTools && hasNotes && <ZoomControl zoom={zoom} onZoom={onZoom} className="zoom-inside" />}
               {items.map((it) => (
                 <button key={it.icon} type="button" role="menuitem" onClick={run(it.fn)} disabled={it.disabled}>
-                  <span className="tm-icon">{it.icon}</span>
+                  <span className="tm-icon">
+                    <Icon name={it.icon} size={18} />
+                  </span>
                   <span className="tm-text">
                     {it.label}
                     <small>{it.hint}</small>
@@ -115,7 +118,9 @@ export function SelectionBar({ count, total, folders, currentFolder, canMove = t
           </button>
           {canMove && (
             <label className="sel-move">
-              <span>📁 Mover</span>
+              <span>
+                <Icon name="folder" size={15} /> Mover
+              </span>
               <select
                 value=""
                 disabled={!count}
@@ -136,16 +141,16 @@ export function SelectionBar({ count, total, folders, currentFolder, canMove = t
             </label>
           )}
           <button type="button" className="sel-btn" onClick={onPin} disabled={!count}>
-            📌 Fixar
+            <Icon name="pin" size={15} /> Fixar
           </button>
           <button type="button" className="sel-btn" onClick={onArchive} disabled={!count}>
-            📦 Arquivar
+            <Icon name="archive" size={15} /> Arquivar
           </button>
           <button type="button" className="sel-btn danger" onClick={onDelete} disabled={!count}>
-            🗑️ Excluir
+            <Icon name="trash" size={15} /> Excluir
           </button>
           <button type="button" className="sel-close" onClick={onCancel} aria-label="Cancelar seleção">
-            ✕
+            <Icon name="x" size={16} />
           </button>
         </motion.div>
       )}

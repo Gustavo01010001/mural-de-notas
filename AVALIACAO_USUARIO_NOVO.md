@@ -91,3 +91,12 @@ de IHC) e **o que sugiro**. Prioridade: 🔴 urgente · 🟠 importante · 🟡 
 | I3 (parte) | Título e texto ganharam rótulo para leitor de tela; a dica da senha fica **fixa embaixo do campo** e conta quantos caracteres faltam. | — |
 | I4 | Erro do título aparece **embaixo do campo**, com borda vermelha, exemplo de como preencher e o cursor volta para o título. O back continua sendo quem valida. | Sem balão, foco no título |
 | I5 | Botão 👁 **mostrar/esconder senha** (44 px) no entrar e no cadastro. | Alterna e volta |
+
+## ✅ Visual corrigido (V1–V4)
+
+| # | O que mudou |
+|---|---|
+| V1 | **Um só estilo de ícone**: novo `components/Icon.js` com ícones de linha em SVG (desenham igual em qualquer sistema). Trocados os emojis de **todos os botões e menus**: post-it (✏️ 📌 ⋯ e menu), barra de baixo, seleção, timer, configurações (tema Escuro/Claro/Auto agora é lua/sol/tela — a "lua que parecia dedinho" sumiu), pastas, formulário do post-it, conta, lixeira, calendário, compartilhar, busca e os 3 botões do topo. **Emoji ficou só no conteúdo do usuário** (ícone da pasta, 🎂, mensagens). |
+| V2 | Zoom e "⋯ Mais" com **48 px**, fundo mais firme e texto mais forte; o + passou de 66 para **60 px** — a barra de baixo ficou equilibrada. |
+| V3 | Post-its decorativos do login **maiores, inteiros e com fita**; os da direita presos pela direita (nunca saem da tela). Conferido: os 4 dentro da tela em 1366×768. |
+| V4 | Cantos: de **25 tamanhos para 4** (8 · 12 · 16 · 20 px, além de redondo; o formato do post-it foi mantido). Sombras: **3 níveis** (`--shadow-sm` botões, `--shadow-md` caixas no mural, `--shadow-lg` menus e janelas), com versão própria no tema claro. |

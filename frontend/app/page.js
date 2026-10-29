@@ -26,6 +26,7 @@ import { useWeather } from '@/lib/useWeather';
 import { applyAppearance } from '@/lib/appearance';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
 import FocusTimer from '@/components/FocusTimer';
+import Icon from '@/components/Icon';
 import { resolveScene } from '@/lib/scenes';
 
 const ALERT_POLL_MS = 60 * 1000;
@@ -958,12 +959,7 @@ export default function BoardPage() {
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.9 }}
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-            <path
-              fill="currentColor"
-              d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm12 8H5v9h14v-9zM5 8h14V6H5v2zm2 4h3v3H7v-3z"
-            />
-          </svg>
+          <Icon name="calendar" size={21} />
         </motion.button>
         <motion.button
           className="gear-btn search-btn"
@@ -973,12 +969,7 @@ export default function BoardPage() {
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.9 }}
         >
-          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden>
-            <path
-              fill="currentColor"
-              d="M10.5 3a7.5 7.5 0 0 1 5.96 12.05l4.25 4.24-1.42 1.42-4.24-4.25A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"
-            />
-          </svg>
+          <Icon name="search" size={21} />
         </motion.button>
         <motion.button
           className="gear-btn"
@@ -989,12 +980,7 @@ export default function BoardPage() {
           whileTap={{ scale: 0.9 }}
           transition={{ type: 'spring', stiffness: 300, damping: 15 }}
         >
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-            <path
-              fill="currentColor"
-              d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54a7.3 7.3 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.66 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.38 1.05.7 1.63.94l.36 2.54c.04.24.25.42.49.42h3.84c.25 0 .45-.18.5-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96c.22.08.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"
-            />
-          </svg>
+          <Icon name="settings" size={21} />
         </motion.button>
       </header>
 
@@ -1065,12 +1051,12 @@ export default function BoardPage() {
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -10, x: '-50%' }}
           >
-            🏷️ Mostrando <b style={{ background: tagColor(tagFilter) }}>#{tagFilter}</b>
+            <Icon name="tag" size={15} /> Mostrando <b style={{ background: tagColor(tagFilter) }}>#{tagFilter}</b>
             <span>
               {visibleNotes.length} de {notes.length}
             </span>
             <button type="button" onClick={() => setTagFilter(null)} aria-label="Tirar filtro">
-              ✕
+              <Icon name="x" size={14} />
             </button>
           </motion.div>
         )}
@@ -1160,7 +1146,13 @@ export default function BoardPage() {
         >
           <button type="button" className="upcoming-head" onClick={() => setUpcomingOpen((o) => !o)} aria-expanded={upcomingOpen}>
             <h4>
-              {upcomingOpen ? 'Próximas datas' : `📅 ${upcoming.length} data${upcoming.length === 1 ? '' : 's'} chegando`}
+              {upcomingOpen ? (
+                'Próximas datas'
+              ) : (
+                <>
+                  <Icon name="calendar" size={15} /> {upcoming.length} data{upcoming.length === 1 ? '' : 's'} chegando
+                </>
+              )}
             </h4>
             <motion.span className="chevron" animate={{ rotate: upcomingOpen ? 0 : 180 }}>
               ▾

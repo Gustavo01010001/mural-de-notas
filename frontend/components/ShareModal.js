@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import Icon from './Icon';
 
 const initials = (name) =>
   name
@@ -92,10 +93,10 @@ export default function ShareModal({ folder, me, onClose, onChanged, onLeft, toa
           >
             <header className="trash-head">
               <h2>
-                👥 {folder.icon} {folder.name}
+                <Icon name="users" size={20} /> {folder.icon} {folder.name}
               </h2>
               <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar">
-                ✕
+                <Icon name="x" size={18} />
               </button>
             </header>
 

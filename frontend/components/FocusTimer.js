@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { playSound } from '@/lib/sounds';
+import Icon from './Icon';
 
 const KEY = 'mural_focus';
 const fmt = (ms) => {
@@ -98,7 +99,7 @@ export default function FocusTimer({ focusMinutes = 25, breakMinutes = 5, onClos
       <span className="focus-progress" style={{ transform: `scaleX(${progress})` }} />
       <div className="focus-main">
         <button type="button" className="focus-mode" onClick={switchMode} title="Trocar entre foco e pausa">
-          {state.mode === 'focus' ? '🎯 Foco' : '☕ Pausa'}
+          <Icon name={state.mode === 'focus' ? 'target' : 'coffee'} size={14} /> {state.mode === 'focus' ? 'Foco' : 'Pausa'}
         </button>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={fmt(left).slice(0, 2)} className="focus-time" initial={calm ? false : { y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
@@ -114,22 +115,22 @@ export default function FocusTimer({ focusMinutes = 25, breakMinutes = 5, onClos
       </div>
       <div className="focus-actions">
         {state.running ? (
-          <button type="button" onClick={pause} aria-label="Pausar">
-            ⏸
+          <button type="button" onClick={pause} aria-label="Pausar" title="Pausar">
+            <Icon name="pause" size={14} />
           </button>
         ) : (
-          <button type="button" className="primary" onClick={start} aria-label="Começar">
-            ▶
+          <button type="button" className="primary" onClick={start} aria-label="Começar" title="Começar">
+            <Icon name="play" size={14} />
           </button>
         )}
         {/* "recomeçar" só aparece quando já contou algum tempo (menos botões à toa) */}
         {left < total - 1000 && (
           <button type="button" onClick={reset} aria-label="Recomeçar" title="Recomeçar">
-            ↺
+            <Icon name="reset" size={15} />
           </button>
         )}
         <button type="button" onClick={onClose} aria-label="Esconder o timer" title="Esconder (o tempo continua guardado)">
-          ✕
+          <Icon name="x" size={15} />
         </button>
       </div>
     </motion.div>

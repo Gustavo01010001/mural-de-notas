@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
 import { COLORS } from '@/lib/format';
 import { childrenOf, MAX_DEPTH, pathOf, validParents } from '@/lib/folderTree';
+import Icon from './Icon';
 
 export const FOLDER_ICONS = ['📁', '💼', '📚', '💡', '✈️', '🍳', '🏠', '❤️', '🎯', '🎮', '🎵', '🛒', '💰', '🏋️', '🧠', '⭐'];
 
@@ -127,7 +128,8 @@ function FolderItem({ folder, depth, ctx }) {
             <span className="folder-name">{folder.name}</span>
             {folder.memberCount > 0 && (
               <span className="folder-shared-badge" title={`Compartilhada com ${folder.memberCount} pessoa(s)`}>
-                👥{folder.memberCount}
+                <Icon name="users" size={13} />
+                {folder.memberCount}
               </span>
             )}
             <span className="folder-count">{folder.noteCount}</span>
@@ -141,17 +143,17 @@ function FolderItem({ folder, depth, ctx }) {
               <>
                 {depth < MAX_DEPTH && (
                   <button type="button" onClick={() => (ctx.expand(folder.id), setMode('sub'))} aria-label={`Nova subpasta em ${folder.name}`} title="Nova subpasta">
-                    ＋
+                    <Icon name="plus" size={15} />
                   </button>
                 )}
                 <button type="button" onClick={() => ctx.onShare(folder)} aria-label={`Compartilhar ${folder.name}`} title="Compartilhar">
-                  👥
+                  <Icon name="users" size={15} />
                 </button>
                 <button type="button" onClick={() => setMode('edit')} aria-label={`Editar ${folder.name}`} title="Editar">
-                  ✏️
+                  <Icon name="edit" size={15} />
                 </button>
                 <button type="button" onClick={() => setConfirming(true)} aria-label={`Apagar ${folder.name}`} title="Apagar">
-                  🗑️
+                  <Icon name="trash" size={15} />
                 </button>
               </>
             )}
@@ -349,7 +351,7 @@ export default function FolderSwitcher({
                 />
               ) : (
                 <motion.button key="add" type="button" className="folder-add" onClick={() => setCreating(true)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  ＋ Nova pasta
+                  <Icon name="plus" size={16} /> Nova pasta
                 </motion.button>
               )}
             </AnimatePresence>
@@ -373,7 +375,7 @@ export default function FolderSwitcher({
                       </button>
                       <div className="folder-actions">
                         <button type="button" onClick={() => ctx.onShare(f)} aria-label={`Pessoas em ${f.name}`} title="Quem participa">
-                          👥
+                          <Icon name="users" size={15} />
                         </button>
                       </div>
                     </div>
@@ -384,10 +386,10 @@ export default function FolderSwitcher({
 
             <div className="folder-special">
               <button type="button" onClick={() => (setOpen(false), onOpenSpecial('archive'))}>
-                📦 Arquivados <span className="folder-count">{archivedCount}</span>
+                <Icon name="archive" size={16} /> Arquivados <span className="folder-count">{archivedCount}</span>
               </button>
               <button type="button" onClick={() => (setOpen(false), onOpenSpecial('trash'))}>
-                🗑️ Lixeira <span className="folder-count">{trashCount}</span>
+                <Icon name="trash" size={16} /> Lixeira <span className="folder-count">{trashCount}</span>
               </button>
             </div>
           </motion.div>

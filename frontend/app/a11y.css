@@ -268,7 +268,7 @@ html.theme-light .focus-actions button:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: rgba(22, 22, 30, 0.97);
   border: 1px solid var(--glass-border);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
@@ -285,7 +285,7 @@ html.theme-light .tools-menu-list {
   gap: 10px;
   padding: 9px 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -341,7 +341,9 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
 }
 
 /* Botões do post-it (avaliação de usuário novo U2–U4): maiores, visíveis e sem cobrir o título */
-.postit-actions button {
+/* só os botões do post-it (não os itens do menu ⋯) */
+.postit-actions > button,
+.postit-menu > button {
   min-width: 30px;
   height: 30px;
   display: inline-flex;
@@ -367,7 +369,7 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
     position: relative;
     width: 34px;
     height: 34px;
-    border-radius: 10px;
+    border-radius: 12px;
     background: rgba(0, 0, 0, 0.14);
     color: rgba(0, 0, 0, 0.75);
     font-size: 1.15rem;
@@ -407,7 +409,7 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
   align-items: center;
   gap: 2px;
   padding: 6px 2px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
   font-size: 0.72rem;
 }
@@ -490,7 +492,7 @@ html.theme-light .tools-menu-list > button:hover:not(:disabled) {
 
 .account-form input {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
@@ -556,7 +558,7 @@ html.theme-light .account-warn {
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--muted);
 }
@@ -740,7 +742,7 @@ html.theme-light .field-hint.warn {
   width: 100%;
   max-height: 140px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .print-date,
@@ -821,5 +823,186 @@ html.theme-light .field-hint.warn {
   .forecast-icon {
     width: 26px;
     height: 26px;
+  }
+}
+
+/* =====================================================================
+   Padrão visual (V1–V4): um só estilo de ícone, 4 tamanhos de canto
+   (8 · 12 · 16 · 20 px, além de redondo) e 3 níveis de sombra
+   ===================================================================== */
+:root {
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-light {
+  --shadow-sm: 0 2px 8px rgba(60, 40, 0, 0.1);
+  --shadow-md: 0 10px 28px rgba(60, 40, 0, 0.14);
+  --shadow-lg: 0 20px 50px rgba(60, 40, 0, 0.18);
+}
+
+/* nível 1: botões soltos no mural */
+.gear-btn,
+.folder-trigger,
+.brand,
+.tool-btn,
+.zoom-control,
+.focus-timer {
+  box-shadow: var(--shadow-sm);
+}
+
+/* nível 2: caixas que ficam no mural */
+.weather,
+.upcoming,
+.selection-bar,
+.toast,
+.tag-filter-pill {
+  box-shadow: var(--shadow-md);
+}
+
+/* nível 3: o que abre por cima (menus, painéis, janelas) */
+.folder-panel,
+.search-panel,
+.trash-panel,
+.share-modal,
+.calendar-panel,
+.drawer,
+.tools-menu-list,
+.postit-menu-list,
+.note-modal,
+.auth-card {
+  box-shadow: var(--shadow-lg);
+}
+
+html.theme-light :is(.folder-panel, .drawer, .search-panel, .trash-panel, .share-modal, .calendar-panel, .toast, .selection-bar, .drop-dock, .tag-filter-pill, .postit-menu-list, .auth-card, .upcoming, .focus-timer) {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ícones de linha alinhados ao texto */
+.ic {
+  flex-shrink: 0;
+  vertical-align: -0.18em;
+}
+
+:is(.tool-btn, .sel-btn, .sel-move > span, .focus-mode, .segmented-label, .modal-label, .folder-special button, .folder-add, .extra-chip, .account-toggle, .btn-small, .search-recent button, .sf-check, .upcoming-head h4, .tag-filter-pill, .folder-shared-badge, .date-field > span:first-child, .folder-select > span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:is(.drawer-head h2, .trash-head h2, .calendar-panel h2, .gear-spin) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.postit-menu-list button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.postit-menu-list button .ic,
+.tm-icon .ic {
+  opacity: 0.85;
+}
+
+.account-btn > .ic {
+  grid-row: span 2;
+  opacity: 0.9;
+}
+
+/* barra de baixo (V2): mesma altura do + e mais presença no fundo escuro */
+.zoom-control,
+.tool-btn {
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(30, 30, 40, 0.88);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+html.theme-light :is(.zoom-control, .tool-btn) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.zoom-control button {
+  min-width: 42px;
+}
+
+.zoom-control .zoom-value {
+  min-width: 58px;
+  font-weight: 600;
+}
+
+.tool-btn {
+  padding: 0 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.focus-timer {
+  height: 48px;
+  border-radius: 16px;
+}
+
+.fab {
+  width: 60px;
+  height: 60px;
+  font-size: 2.1rem;
+}
+
+.board-tools {
+  bottom: 34px;
+  right: 104px;
+}
+
+/* login (V3): post-its decorativos inteiros, dentro da tela */
+.floating-note {
+  width: 170px;
+  min-height: 120px;
+  padding: 26px 18px 18px;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  box-shadow: var(--shadow-lg);
+}
+
+.floating-note::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 70px;
+  height: 22px;
+  margin-left: -35px;
+  background: rgba(255, 255, 255, 0.45);
+  transform: rotate(-3deg);
+}
+
+@media (max-width: 1100px) {
+  .floating-note {
+    width: 140px;
+    min-height: 100px;
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .tool-btn {
+    width: 48px;
+    padding: 0;
+  }
+
+  .board-tools {
+    right: 86px !important;
+    bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .upcoming {
+    right: 146px !important;
   }
 }

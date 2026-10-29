@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { eventIcon, googleCalendarUrl, repeatLabel } from '@/lib/format';
+import Icon from './Icon';
 
 const WEEK = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -77,7 +78,7 @@ export default function CalendarPanel({ open, onClose, onPick, onAuthError }) {
             </button>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.h2 key={month} initial={{ x: dir * 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -dir * 30, opacity: 0 }}>
-                📅 {MONTHS[m - 1]} {y}
+                <Icon name="calendar" size={18} /> {MONTHS[m - 1]} {y}
               </motion.h2>
             </AnimatePresence>
             <button type="button" className="icon-btn" onClick={() => go(1)} aria-label="Próximo mês">
@@ -89,7 +90,7 @@ export default function CalendarPanel({ open, onClose, onPick, onAuthError }) {
               </button>
             )}
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar">
-              ✕
+              <Icon name="x" size={18} />
             </button>
           </header>
 

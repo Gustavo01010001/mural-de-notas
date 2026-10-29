@@ -6,6 +6,7 @@ import { COLORS } from '@/lib/format';
 import { SCENES, sceneFromWeather, sceneInfo } from '@/lib/scenes';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
 import AccountSection from './AccountSection';
+import Icon from './Icon';
 
 function Toggle({ checked, onChange, label, hint }) {
   return (
@@ -37,7 +38,10 @@ function Segmented({ value, options, onChange, label }) {
             onClick={() => onChange(o.id)}
           >
             {value === o.id && <motion.span layoutId={`seg-${label}`} className="segmented-pill" />}
-            <span className="segmented-label">{o.label}</span>
+            <span className="segmented-label">
+              {o.icon && <Icon name={o.icon} size={15} />}
+              {o.label}
+            </span>
           </button>
         ))}
       </div>
@@ -118,10 +122,13 @@ export default function SettingsPanel({
           >
             <header className="drawer-head">
               <h2>
-                <span className="gear-spin">⚙️</span> Configurações
+                <span className="gear-spin">
+                  <Icon name="settings" size={22} />
+                </span>{' '}
+                Configurações
               </h2>
               <button className="icon-btn" onClick={onClose} aria-label="Fechar">
-                ✕
+                <Icon name="x" size={18} />
               </button>
             </header>
 
@@ -150,9 +157,9 @@ export default function SettingsPanel({
                   value={settings.theme}
                   onChange={set('theme')}
                   options={[
-                    { id: 'dark', label: '🌙 Escuro' },
-                    { id: 'light', label: '☀️ Claro' },
-                    { id: 'auto', label: '🔄 Auto' },
+                    { id: 'dark', icon: 'moon', label: 'Escuro' },
+                    { id: 'light', icon: 'sun', label: 'Claro' },
+                    { id: 'auto', icon: 'auto', label: 'Auto' },
                   ]}
                 />
                 <Segmented
@@ -370,8 +377,8 @@ export default function SettingsPanel({
                   value={settings.mobileLayout}
                   onChange={set('mobileLayout')}
                   options={[
-                    { id: 'grid', label: '▦ Grade' },
-                    { id: 'free', label: '✋ Livre' },
+                    { id: 'grid', icon: 'grid', label: 'Grade' },
+                    { id: 'free', icon: 'hand', label: 'Livre' },
                   ]}
                 />
                 <p className="set-note">

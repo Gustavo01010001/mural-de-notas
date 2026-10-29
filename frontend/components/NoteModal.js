@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { COLORS, EVENT_TYPES, REMIND_OPTIONS, REPEAT_OPTIONS, repeatLabel } from '@/lib/format';
 import { compressImage, parseTagInput, tagColor } from '@/lib/noteHelpers';
 import { noteImageUrl } from '@/lib/api';
+import Icon from './Icon';
 
 const EMPTY = {
   title: '',
@@ -148,10 +149,10 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
   // Campos extras só aparecem quando a pessoa pede (ou quando o post-it já usa)
   const show = (key) => extras[key];
   const addable = [
-    ['checklist', '☑️ Checklist'],
-    ['tags', '🏷️ Etiqueta'],
-    ['photo', '📷 Foto'],
-    ['date', '📅 Data'],
+    ['checklist', 'checkSquare', 'Checklist'],
+    ['tags', 'tag', 'Etiqueta'],
+    ['photo', 'camera', 'Foto'],
+    ['date', 'calendar', 'Data'],
   ].filter(([key]) => !show(key));
 
   return (
@@ -203,7 +204,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                 >
-                  ⚠️ {titleError} Escreva algo curto, como “Dentista” ou “Comprar pão”.
+                  <Icon name="alert" size={14} /> {titleError} Escreva algo curto, como “Dentista” ou “Comprar pão”.
                 </motion.small>
               )}
             </AnimatePresence>
@@ -222,7 +223,9 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             {/* Checklist */}
             {show('checklist') && (
               <div className="modal-section">
-                <span className="modal-label">☑️ Checklist</span>
+                <span className="modal-label">
+                <Icon name="checkSquare" size={15} /> Checklist
+              </span>
                 <AnimatePresence initial={false}>
                   {form.checklist.map((item) => (
                     <motion.div
@@ -240,7 +243,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                         onChange={(e) => updateItem(item.id, { text: e.target.value })}
                       />
                       <button type="button" className="icon-mini" onClick={() => removeItem(item.id)} aria-label="Remover item">
-                        ✕
+                        <Icon name="x" size={13} />
                       </button>
                     </motion.div>
                   ))}
@@ -260,7 +263,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                       }}
                     />
                     <button type="button" className="icon-mini" onClick={addItem} aria-label="Adicionar item">
-                      ＋
+                      <Icon name="plus" size={15} />
                     </button>
                   </div>
                 )}
@@ -270,13 +273,15 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             {/* Etiquetas */}
             {show('tags') && (
               <div className="modal-section">
-                <span className="modal-label">🏷️ Etiquetas</span>
+                <span className="modal-label">
+                <Icon name="tag" size={15} /> Etiquetas
+              </span>
                 <div className="tag-edit">
                   {form.tags.map((t) => (
                     <span key={t} className="tag-chip" style={{ background: tagColor(t) }}>
                       #{t}
                       <button type="button" onClick={() => setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))} aria-label={`Tirar #${t}`}>
-                        ✕
+                        <Icon name="x" size={13} />
                       </button>
                     </span>
                   ))}
@@ -307,7 +312,9 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             {/* Foto */}
             {show('photo') && (
               <div className="modal-section">
-                <span className="modal-label">📷 Foto</span>
+                <span className="modal-label">
+                <Icon name="camera" size={15} /> Foto
+              </span>
                 {preview && image !== 'remove' ? (
                   <div className="image-preview">
                     <img src={preview} alt="Prévia da foto" />
@@ -341,7 +348,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
             {addable.length > 0 && (
               <div className="add-extras" role="group" aria-label="Adicionar ao post-it">
                 <span>Adicionar:</span>
-                {addable.map(([key, label]) => (
+                {addable.map(([key, icon, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -352,7 +359,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                       if (key === 'photo') fileRef.current?.click();
                     }}
                   >
-                    {label}
+                    <Icon name={icon} size={15} /> {label}
                   </button>
                 ))}
               </div>
@@ -376,7 +383,9 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
 
             {folders.length > 0 && (
               <label className="folder-select">
-                <span>📁 Pasta</span>
+                <span>
+                  <Icon name="folder" size={15} /> Pasta
+                </span>
                 <select
                   value={form.folderId ?? ''}
                   disabled={sharedLocked}
@@ -443,7 +452,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                         <input type="time" value={form.eventTime} onChange={set('eventTime')} />
                         {form.eventTime && (
                           <button type="button" className="icon-mini" onClick={() => setForm((f) => ({ ...f, eventTime: '' }))} aria-label="Tirar horário">
-                            ✕
+                            <Icon name="x" size={13} />
                           </button>
                         )}
                       </span>
@@ -451,7 +460,9 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                   </div>
                   <div className="date-row">
                     <label className="date-field">
-                      <span>🔔 Avisar</span>
+                      <span>
+                        <Icon name="bell" size={14} /> Avisar
+                      </span>
                       <select value={form.remindBefore} onChange={(e) => setForm((f) => ({ ...f, remindBefore: Number(e.target.value) }))}>
                         {REMIND_OPTIONS.filter((o) => form.eventTime || o.id === 0 || o.id >= 1440).map((o) => (
                           <option key={o.id} value={o.id}>
@@ -461,7 +472,9 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                       </select>
                     </label>
                     <label className="date-field">
-                      <span>🔁 Repetir</span>
+                      <span>
+                        <Icon name="repeat" size={14} /> Repetir
+                      </span>
                       {form.eventType === 'birthday' ? (
                         <select value="yearly" disabled>
                           <option value="yearly">Todo ano 🎂</option>
@@ -484,7 +497,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
 
             {otherError && (
               <small className="field-error" role="alert">
-                ⚠️ {otherError}
+                <Icon name="alert" size={14} /> {otherError}
               </small>
             )}
 
@@ -493,7 +506,7 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                 Cancelar
               </button>
               <motion.button type="submit" className="btn-dark" disabled={saving} whileTap={{ scale: 0.95 }}>
-                {saving ? 'Salvando...' : note ? 'Salvar' : 'Colar no mural 📌'}
+                {saving ? 'Salvando...' : note ? 'Salvar' : 'Colar no mural'}
               </motion.button>
             </div>
           </motion.form>

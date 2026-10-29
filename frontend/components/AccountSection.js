@@ -5,6 +5,7 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, API_URL, SAFE_HEADERS } from '@/lib/api';
+import Icon from './Icon';
 
 export default function AccountSection({ user, toast, onAuthError, onImported, onDeleted }) {
   const [busy, setBusy] = useState(null);
@@ -91,22 +92,22 @@ export default function AccountSection({ user, toast, onAuthError, onImported, o
       <h3>Conta e privacidade</h3>
       <div className="account-buttons">
         <button type="button" className="account-btn" onClick={downloadBackup} disabled={busy === 'backup'}>
-          💾 <span>{busy === 'backup' ? 'Gerando...' : 'Baixar backup'}</span>
+          <Icon name="download" size={20} /> <span>{busy === 'backup' ? 'Gerando...' : 'Baixar backup'}</span>
           <small>Arquivo com todos os post-its, pastas e fotos</small>
         </button>
         <a className="account-btn" href="/exportar" target="_blank" rel="noopener">
-          🖨️ <span>Salvar em PDF</span>
+          <Icon name="printer" size={20} /> <span>Salvar em PDF</span>
           <small>Abre uma página para imprimir ou salvar como PDF</small>
         </a>
         <button type="button" className="account-btn" onClick={() => fileRef.current?.click()} disabled={busy === 'import'}>
-          📥 <span>{busy === 'import' ? 'Importando...' : 'Importar backup'}</span>
+          <Icon name="upload" size={20} /> <span>{busy === 'import' ? 'Importando...' : 'Importar backup'}</span>
           <small>Traz de volta um arquivo de backup (soma ao que já existe)</small>
         </button>
         <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importBackup} />
       </div>
 
       <button type="button" className="btn-text account-toggle" onClick={() => (setPwOpen((o) => !o), setError(''))}>
-        🔑 {hasPassword ? 'Trocar senha' : 'Criar uma senha'}
+        <Icon name="key" size={15} /> {hasPassword ? 'Trocar senha' : 'Criar uma senha'}
       </button>
       <AnimatePresence initial={false}>
         {pwOpen && (
@@ -125,7 +126,7 @@ export default function AccountSection({ user, toast, onAuthError, onImported, o
       {error && !delOpen && <p className="auth-error">{error}</p>}
 
       <button type="button" className="btn-text account-toggle danger" onClick={() => (setDelOpen((o) => !o), setError(''), setConfirm(''))}>
-        ⚠️ Excluir minha conta
+        <Icon name="alert" size={15} /> Excluir minha conta
       </button>
       <AnimatePresence initial={false}>
         {delOpen && (
@@ -133,7 +134,7 @@ export default function AccountSection({ user, toast, onAuthError, onImported, o
             <p>
               <b>Antes, baixe um backup</b> — com ele você recupera seus post-its em qualquer conta.
               <button type="button" className="btn-small" onClick={downloadBackup}>
-                💾 Baixar agora
+                <Icon name="download" size={14} /> Baixar agora
               </button>
             </p>
             <p>
@@ -141,7 +142,7 @@ export default function AccountSection({ user, toast, onAuthError, onImported, o
               pastas e fotos). Depois disso, é apagada para sempre — inclusive pastas que você compartilhou.
             </p>
             <p className="account-warn">
-              🔐 Seus post-its <b>não são criptografados</b>. Se você anotou senhas neles, troque essas senhas e prefira um
+              <Icon name="lock" size={14} /> Seus post-its <b>não são criptografados</b>. Se você anotou senhas neles, troque essas senhas e prefira um
               gerenciador de senhas para guardá-las.
             </p>
             <input

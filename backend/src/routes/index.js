@@ -5,6 +5,7 @@ import { AlertController } from '../controllers/alertController.js';
 import { WeatherController } from '../controllers/weatherController.js';
 import { SettingsController } from '../controllers/settingsController.js';
 import { FolderController } from '../controllers/folderController.js';
+import { LiveController } from '../controllers/liveController.js';
 import { requireAuth } from '../middlewares/auth.js';
 
 export const router = Router();
@@ -17,15 +18,24 @@ router.post('/auth/login', AuthController.login);
 router.get('/auth/me', requireAuth, AuthController.me);
 router.post('/auth/logout', requireAuth, AuthController.logout);
 
-// Pastas
+// Pastas (subpastas, ordem, cor) e compartilhamento
 router.get('/folders', requireAuth, FolderController.list);
 router.post('/folders', requireAuth, FolderController.create);
+router.put('/folders/order', requireAuth, FolderController.reorder);
 router.put('/folders/:id', requireAuth, FolderController.update);
 router.delete('/folders/:id', requireAuth, FolderController.remove);
+router.get('/folders/:id/members', requireAuth, FolderController.members);
+router.post('/folders/:id/members', requireAuth, FolderController.addMember);
+router.delete('/folders/:id/members/:userId', requireAuth, FolderController.removeMember);
+
+// Ao vivo nas pastas compartilhadas (presença, cursores, mudanças)
+router.get('/live/folders/:id', requireAuth, LiveController.stream);
+router.post('/live/folders/:id/cursor', requireAuth, LiveController.cursor);
 
 // Post-its — rotas fixas antes das que têm :id
 router.get('/notes', requireAuth, NoteController.list);
 router.get('/notes/search', requireAuth, NoteController.search);
+router.get('/notes/tags', requireAuth, NoteController.tags);
 router.get('/notes/archived', requireAuth, NoteController.archived);
 router.get('/notes/trash', requireAuth, NoteController.trash);
 router.delete('/notes/trash', requireAuth, NoteController.emptyTrash);
@@ -52,6 +62,7 @@ router.delete('/notes/:id/image', requireAuth, NoteController.removeImage);
 // Alertas de datas importantes
 router.get('/alerts', requireAuth, AlertController.today);
 router.post('/alerts/:id/dismiss', requireAuth, AlertController.dismiss);
+router.get('/calendar', requireAuth, AlertController.calendar);
 
 // Configurações e perfil
 router.get('/settings', requireAuth, SettingsController.get);

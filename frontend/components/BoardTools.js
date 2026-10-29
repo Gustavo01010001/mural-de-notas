@@ -38,7 +38,7 @@ export function BoardTools({ zoom, onZoom, onArrange, arranging, onSelectMode, s
 }
 
 // Barra que aparece quando há post-its selecionados
-export function SelectionBar({ count, total, folders, currentFolder, onMove, onArchive, onDelete, onPin, onSelectAll, onCancel }) {
+export function SelectionBar({ count, total, folders, currentFolder, canMove = true, onMove, onArchive, onDelete, onPin, onSelectAll, onCancel }) {
   return (
     <AnimatePresence>
       {count !== null && (
@@ -55,24 +55,28 @@ export function SelectionBar({ count, total, folders, currentFolder, onMove, onA
           <button type="button" className="sel-btn" onClick={onSelectAll} disabled={count === total}>
             Todos
           </button>
-          <label className="sel-move">
-            <span>📁 Mover</span>
-            <select
-              value=""
-              disabled={!count}
-              onChange={(e) => e.target.value !== '' && onMove(e.target.value === 'root' ? null : Number(e.target.value))}
-            >
-              <option value="">Mover para…</option>
-              {currentFolder !== null && <option value="root">📌 Mural geral</option>}
-              {folders
-                .filter((f) => f.id !== currentFolder)
-                .map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.icon} {f.name}
-                  </option>
-                ))}
-            </select>
-          </label>
+          {canMove && (
+            <label className="sel-move">
+              <span>📁 Mover</span>
+              <select
+                value=""
+                disabled={!count}
+                onChange={(e) => e.target.value !== '' && onMove(e.target.value === 'root' ? null : Number(e.target.value))}
+              >
+                <option value="">Mover para…</option>
+                {currentFolder !== null && <option value="root">📌 Mural geral</option>}
+                {folders
+                  .filter((f) => f.id !== currentFolder)
+                  .map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {'  '.repeat((f.depth ?? 1) - 1)}
+                      {(f.depth ?? 1) > 1 ? '└ ' : ''}
+                      {f.icon} {f.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
           <button type="button" className="sel-btn" onClick={onPin} disabled={!count}>
             📌 Fixar
           </button>

@@ -89,3 +89,32 @@ sem rolagem lateral; zoom/arrumar/redimensionar ficam só no PC.
 **Problema encontrado e corrigido:** a foto ficava 5 minutos no cache do navegador — em PC compartilhado,
 outra pessoa no mesmo navegador poderia vê-la sem login. Agora a API manda `Cache-Control: no-store` e o app
 esquece as fotos ao sair da conta.
+
+---
+
+# ✅ Rodada 3 — Pastas compartilhadas, lembretes e busca avançada (29/10/2026)
+
+**Testes automáticos: 51 de 51 passando** (14 novos).
+
+| Área | O que é verificado |
+|------|--------------------|
+| Datas | semanal (mesmo dia da semana), mensal (dia 31 → último dia), começa só na data original, ocorrências num período |
+| Lembretes | etapa "aviso antecipado" e "na hora" (15 min antes, 1 dia antes); validação de horário/aviso/repetição; fechar cada etapa |
+| Calendário | ocorrências repetidas no mês certo; mês inválido |
+| Subpastas | até 3 níveis, sem ciclo, nome repetido só no mesmo nível, reordenar, apagar pasta sobe as subpastas |
+| Compartilhar | convite por e-mail (inexistente, a si mesmo, repetido, convidado não convida), convidado vê/edita/exclui e desfaz, dono vê tudo, e-mails escondidos do convidado, convidado não renomeia nem leva post-its embora, intruso não vê nada |
+| Ao vivo | presença das duas pessoas, cursor chega para o outro (não volta para si), aviso de mudança, sair da pasta corta o acesso |
+| Busca | filtros cor/pasta/etiqueta/com data, "dezembro" e "25/12/2026" (inclui aniversário que repete) |
+
+**No navegador, com duas pessoas ao mesmo tempo (Ana em `https://localhost:3000`, Beto em `https://192.168.3.21:3000`):**
+alerta "Agora: 00:27" e "🔔 Daqui a 30 min", calendário (out: 5, 29, 30; nov: quintas da academia semanal),
+árvore Faculdade › Cálculo/TCC, busca "novembro"/"amanhã"/#viagem + azul, buscas recentes, arrastar post-it até
+"TCC" pela faixa de pastas (+ Desfazer), convite pela janela 👥 (erro para e-mail inexistente), Beto vê a pasta em
+"Compartilhadas comigo", **cursor do Beto com nome aparecendo na tela da Ana**, post-it criado/editado pelo Beto
+aparecendo na Ana sem recarregar, Beto não consegue mover post-it para fora (403). Celular: topo, pastas,
+calendário, busca com filtros e formulário com os campos novos cabem na tela.
+
+**Ajustes feitos durante os testes:** painel de pastas agora fecha ao abrir "compartilhar"; aviso de "movido" com
+ícone 📁; nome da pasta com mais espaço no topo do celular; testes não abrem mais o banco real.
+
+**Não testado:** dois aparelhos físicos diferentes (foram duas abas no mesmo PC), notificação do navegador fora da aba.

@@ -19,6 +19,11 @@ export const UserModel = {
     return this.findById(id);
   },
 
+  // Sem o hash: para convidar alguém para uma pasta
+  findByEmail(email) {
+    return db.prepare(`SELECT ${PUBLIC_FIELDS} FROM users WHERE email = ?`).get(email);
+  },
+
   // Inclui o hash: usado só no login
   findByEmailWithPassword(email) {
     return db.prepare('SELECT * FROM users WHERE email = ?').get(email);

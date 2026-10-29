@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { countdownLabel, eventIcon, formatEventDate } from '@/lib/format';
+import { countdownLabel, eventIcon, formatEventDate, googleCalendarUrl, repeatLabel } from '@/lib/format';
 import { linkify, tagColor } from '@/lib/noteHelpers';
 import { noteImageUrl } from '@/lib/api';
 
@@ -59,6 +59,8 @@ export default function PostIt({
   onToggleCheck,
   onTagClick,
   onSelect,
+  onDragStart,
+  onDrop,
 }) {
   const [pos, setPos] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ width: note.width, height: note.height });
@@ -99,7 +101,10 @@ export default function PostIt({
     // com zoom, 1px na tela não é 1px no mural
     const dx = (e.clientX - d.sx) / zoom;
     const dy = (e.clientY - d.sy) / zoom;
-    if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) > 3) {
+      d.moved = true;
+      onDragStart?.(note); // mostra a faixa de pastas para soltar
+    }
     setPos({ x: Math.max(0, d.ox + dx), y: Math.max(0, d.oy + dy) });
   }
 
@@ -107,6 +112,11 @@ export default function PostIt({
     const d = drag.current;
     drag.current = null;
     setDragging(false);
+    if (d?.moved && onDrop?.(note, e.clientX, e.clientY)) {
+      // soltou em cima de uma pasta: o post-it vai para lá (não salva posição aqui)
+      setPos({ x: d.ox, y: d.oy });
+      return;
+    }
     if (d?.moved) {
       onMove(note.id, {
         x: Math.max(0, d.ox + (e.clientX - d.sx) / zoom),
@@ -244,6 +254,10 @@ export default function PostIt({
                 >
                   {[
                     ['📄', 'Duplicar', () => onDuplicate(note)],
+                    ['📁', 'Mover para pasta…', () => onSelect(note.id)],
+                    ...(note.eventDate
+                      ? [['🗓️', 'Google Agenda', () => window.open(googleCalendarUrl(note), '_blank', 'noopener,noreferrer')]]
+                      : []),
                     ['☑️', 'Selecionar', () => onSelect(note.id)],
                     ['📦', 'Arquivar', () => onArchive(note)],
                     ['🗑️', 'Excluir', () => onDelete(note), 'danger'],
@@ -323,7 +337,8 @@ export default function PostIt({
         <div className="postit-event">
           <span className="postit-event-date">
             {eventIcon(note.eventType)} {formatEventDate(note)}
-            {note.repeatYearly && ' • todo ano'}
+            {note.repeat && note.repeat !== 'none' && ` • 🔁 ${repeatLabel(note)}`}
+            {note.remindBefore > 0 && ' • 🔔'}
           </span>
           <motion.span
             className={`postit-badge ${note.isToday ? 'today' : ''} ${note.daysUntil == null ? 'past' : ''}`}

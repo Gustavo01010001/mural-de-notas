@@ -1,5 +1,5 @@
 import { HttpError } from './httpError.js';
-import { isValidDate } from './dates.js';
+import { isValidDate, isValidTime, REPEATS } from './dates.js';
 
 export const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green', 'orange', 'purple'];
 export const EVENT_TYPES = ['birthday', 'event', 'reminder'];
@@ -38,19 +38,36 @@ export function validateNote(body = {}) {
   const checklist = validateChecklist(body.checklist);
   const tags = validateTags(body.tags);
 
-  let eventDate = body.eventDate ? String(body.eventDate) : null;
+  const eventDate = body.eventDate ? String(body.eventDate) : null;
   let eventType = null;
-  let repeatYearly = false;
+  let eventTime = null;
+  let remindBefore = 0;
+  let repeat = 'none';
 
   if (eventDate) {
     if (!isValidDate(eventDate)) throw new HttpError(400, 'Data importante inválida.');
     eventType = EVENT_TYPES.includes(body.eventType) ? body.eventType : 'event';
-    // Aniversário sempre se repete todo ano
-    repeatYearly = eventType === 'birthday' ? true : Boolean(body.repeatYearly);
+
+    if (body.eventTime) {
+      if (!isValidTime(String(body.eventTime))) throw new HttpError(400, 'Horário inválido (use HH:MM).');
+      eventTime = String(body.eventTime);
+    }
+
+    const before = Number(body.remindBefore ?? 0);
+    if (!REMIND_OPTIONS.includes(before)) throw new HttpError(400, 'Aviso antecipado inválido.');
+    remindBefore = before;
+
+    // "repeat" novo; "repeatYearly" é o formato antigo (continua aceito)
+    repeat = body.repeat ?? (body.repeatYearly ? 'yearly' : 'none');
+    if (!REPEATS.includes(repeat)) throw new HttpError(400, 'Repetição inválida.');
+    if (eventType === 'birthday') repeat = 'yearly'; // aniversário sempre se repete todo ano
   }
 
-  return { title, content, color, checklist, tags, eventDate, eventType, repeatYearly };
+  return { title, content, color, checklist, tags, eventDate, eventType, eventTime, remindBefore, repeat };
 }
+
+// Aviso antecipado (minutos): na hora, 15 min, 30 min, 1 h, 2 h, 1 dia, 2 dias, 1 semana
+export const REMIND_OPTIONS = [0, 15, 30, 60, 120, 1440, 2880, 10080];
 
 const MAX_CHECK_ITEMS = 30;
 const MAX_TAGS = 6;
@@ -202,7 +219,23 @@ export function validateFolder(body = {}) {
     name,
     icon: FOLDER_ICONS.includes(body.icon) ? body.icon : '📁',
     color: NOTE_COLORS.includes(body.color) ? body.color : 'yellow',
+    // subpasta de... (null = pasta principal)
+    parentId: parseFolderId(body.parentId),
   };
+}
+
+export function validateReorder(body = {}) {
+  const ids = Array.isArray(body.ids) ? body.ids.map(Number) : [];
+  if (!ids.length || ids.length > 200 || !ids.every((id) => Number.isInteger(id) && id > 0) || new Set(ids).size !== ids.length) {
+    throw new HttpError(400, 'Ordem inválida.');
+  }
+  return { parentId: parseFolderId(body.parentId), ids };
+}
+
+export function validateInviteEmail(body = {}) {
+  const email = String(body.email ?? '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Digite um e-mail válido.');
+  return email;
 }
 
 // "root", vazio ou null = Mural geral; senão o id da pasta

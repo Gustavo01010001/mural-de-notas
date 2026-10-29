@@ -7,8 +7,11 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { todayIn, nextOccurrence, isValidDate } from '../src/utils/dates.js';
-import { normalize } from '../src/services/searchService.js';
+// Só funções puras aqui: nada que abra o banco no processo de teste (o banco é o do servidor temporário)
+import { todayIn, nextOccurrence, isValidDate, occurrencesBetween, addDays as addDaysYmd } from '../src/utils/dates.js';
+import { normalize } from '../src/utils/text.js';
+import { parseDateTerms } from '../src/utils/dateQuery.js';
+import { reminderStage } from '../src/utils/reminders.js';
 
 const PORT = 4100 + Math.floor(Math.random() * 800);
 const BASE = `http://127.0.0.1:${PORT}/api`;
@@ -85,11 +88,47 @@ describe('Funções de data (unidade)', () => {
   });
 
   test('contagem para datas anuais e únicas', () => {
-    assert.deepEqual(nextOccurrence('2000-10-27', true, '2026-10-27'), { daysUntil: 0, years: 26 });
+    assert.deepEqual(nextOccurrence('2000-10-27', true, '2026-10-27'), { date: '2026-10-27', daysUntil: 0, years: 26 });
     assert.equal(nextOccurrence('2000-10-28', true, '2026-10-27').daysUntil, 1);
     assert.equal(nextOccurrence('2000-10-26', true, '2026-10-27').daysUntil, 364); // já passou: ano que vem
     assert.equal(nextOccurrence('2026-12-25', false, '2026-10-27').daysUntil, 59);
     assert.equal(nextOccurrence('2026-10-01', false, '2026-10-27'), null); // evento único que passou
+  });
+
+  test('repetição semanal e mensal (dia 31 vira o último dia do mês)', () => {
+    // 2026-10-05 é segunda-feira
+    assert.equal(nextOccurrence('2026-10-05', 'weekly', '2026-10-07').date, '2026-10-12');
+    assert.equal(nextOccurrence('2026-10-05', 'weekly', '2026-10-12').daysUntil, 0);
+    assert.equal(nextOccurrence('2026-01-05', 'monthly', '2026-10-06').date, '2026-11-05');
+    assert.equal(nextOccurrence('2026-01-31', 'monthly', '2026-02-01').date, '2026-02-28');
+    // repetição só começa na data original
+    assert.equal(nextOccurrence('2026-12-20', 'monthly', '2026-10-01').date, '2026-12-20');
+    assert.deepEqual(occurrencesBetween('2026-10-05', 'weekly', '2026-10-01', '2026-10-31'), [
+      '2026-10-05',
+      '2026-10-12',
+      '2026-10-19',
+      '2026-10-26',
+    ]);
+    assert.deepEqual(occurrencesBetween('2026-10-15', 'none', '2026-11-01', '2026-11-30'), []);
+  });
+
+  test('etapa do lembrete: aviso antecipado e na hora', () => {
+    const base = { nextDate: '2026-10-29', eventTime: '14:00', remindBefore: 60 };
+    assert.equal(reminderStage(base, { date: '2026-10-29', minutes: 12 * 60 }), null); // 12:00
+    assert.equal(reminderStage(base, { date: '2026-10-29', minutes: 13 * 60 + 5 }), 'soon'); // 13:05
+    assert.equal(reminderStage(base, { date: '2026-10-29', minutes: 14 * 60 }), 'due'); // 14:00
+    const dayBefore = { nextDate: '2026-10-30', eventTime: null, remindBefore: 1440 };
+    assert.equal(reminderStage(dayBefore, { date: '2026-10-29', minutes: 9 * 60 }), 'soon'); // "1 dia antes"
+    assert.equal(reminderStage({ ...dayBefore, nextDate: '2026-10-29' }, { date: '2026-10-29', minutes: 1 }), 'due');
+  });
+
+  test('busca entende datas escritas', () => {
+    const p = parseDateTerms(['reuniao', 'outubro', '2027'], '2026-10-29');
+    assert.deepEqual(p.terms, ['reuniao']);
+    assert.deepEqual(p.range, { from: '2027-10-01', to: '2027-10-31' });
+    assert.deepEqual(parseDateTerms(['25/12'], '2026-10-29').range, { from: '2026-12-25', to: '2026-12-25' });
+    assert.deepEqual(parseDateTerms(['amanha'], '2026-10-29').range, { from: '2026-10-30', to: '2026-10-30' });
+    assert.equal(parseDateTerms(['31/02'], '2026-10-29').range, null); // data impossível vira texto
   });
 
   test('fuso inválido não quebra (usa São Paulo)', () => {
@@ -583,6 +622,265 @@ describe('Foto do post-it', () => {
     await call(`/notes/${n.id}/image`, { method: 'PUT', token, body: { dataUrl: PNG } });
     const other = await newUser();
     assert.equal((await call(`/notes/${n.id}/image`, { token: other.token })).status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Subpastas, cor e ordem das pastas', () => {
+  let token;
+  before(async () => ({ token } = await newUser()));
+  const mk = async (body) => (await call('/folders', { method: 'POST', token, body })).data;
+
+  test('cria subpastas até 3 níveis, sem ciclos', async () => {
+    const facul = (await mk({ name: 'Faculdade', color: 'blue' })).folder;
+    assert.equal(facul.color, 'blue');
+    const calc = (await mk({ name: 'Cálculo', parentId: facul.id })).folder;
+    const provas = (await mk({ name: 'Provas', parentId: calc.id })).folder;
+    assert.equal(calc.parentId, facul.id);
+    assert.equal(provas.parentId, calc.id);
+
+    const tooDeep = await call('/folders', { method: 'POST', token, body: { name: 'Nível 4', parentId: provas.id } });
+    assert.equal(tooDeep.status, 400);
+    // pôr Faculdade dentro da própria subpasta = ciclo
+    assert.equal((await call(`/folders/${facul.id}`, { method: 'PUT', token, body: { name: 'Faculdade', parentId: calc.id } })).status, 400);
+    // mesmo nome pode existir em lugares diferentes, mas não no mesmo nível
+    assert.equal((await mk({ name: 'Provas', parentId: facul.id })).folder.name, 'Provas');
+    assert.equal((await call('/folders', { method: 'POST', token, body: { name: 'provas', parentId: calc.id } })).status, 409);
+    // renomear sem mandar parentId não muda o lugar
+    const ren = await call(`/folders/${calc.id}`, { method: 'PUT', token, body: { name: 'Cálculo II', color: 'pink' } });
+    assert.equal(ren.data.folder.parentId, facul.id);
+    assert.equal(ren.data.folder.color, 'pink');
+  });
+
+  test('reordenar e apagar pasta com subpastas (sobem um nível)', async () => {
+    const a = (await mk({ name: 'A' })).folder;
+    const b = (await mk({ name: 'B' })).folder;
+    const all = (await call('/folders', { token })).data.folders.filter((f) => f.parentId === null);
+    const ids = all.map((f) => f.id).reverse();
+    const r = await call('/folders/order', { method: 'PUT', token, body: { parentId: null, ids } });
+    assert.equal(r.status, 200);
+    const after = r.data.folders.filter((f) => f.parentId === null).sort((x, y) => x.position - y.position);
+    assert.deepEqual(after.map((f) => f.id), ids);
+    assert.equal((await call('/folders/order', { method: 'PUT', token, body: { parentId: null, ids: [a.id] } })).status, 400);
+
+    const child = (await mk({ name: 'Filha', parentId: b.id })).folder;
+    const n = (await call('/notes', { method: 'POST', token, body: { title: 'na B', folderId: b.id } })).data.note;
+    await call(`/folders/${b.id}`, { method: 'DELETE', token });
+    const list = (await call('/folders', { token })).data.folders;
+    assert.equal(list.find((f) => f.id === child.id).parentId, null);
+    assert.ok((await call('/notes?folder=root', { token })).data.notes.some((x) => x.id === n.id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Pasta compartilhada', () => {
+  let ana, beto, intruso, folder;
+  before(async () => {
+    ana = await newUser('Ana');
+    beto = await newUser('Beto');
+    intruso = await newUser('Intruso');
+    folder = (await call('/folders', { method: 'POST', token: ana.token, body: { name: 'Viagem para o Rio', icon: '✈️' } })).data.folder;
+  });
+
+  test('convidar por e-mail (e erros de convite)', async () => {
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: ana.token, body: { email: 'ninguem@x.dev' } })).status, 404);
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: ana.token, body: { email: ana.email } })).status, 400);
+    // convidado não pode convidar
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: beto.token, body: { email: beto.email } })).status, 404);
+
+    const r = await call(`/folders/${folder.id}/members`, { method: 'POST', token: ana.token, body: { email: beto.email.toUpperCase() } });
+    assert.equal(r.status, 201);
+    assert.equal((await call(`/folders/${folder.id}/members`, { method: 'POST', token: ana.token, body: { email: beto.email } })).status, 409);
+
+    const shared = (await call('/folders', { token: beto.token })).data.shared;
+    assert.equal(shared[0].name, 'Viagem para o Rio');
+    assert.equal(shared[0].ownerName, 'Ana');
+
+    // convidado vê nomes, mas não os e-mails
+    const m = (await call(`/folders/${folder.id}/members`, { token: beto.token })).data;
+    assert.equal(m.role, 'member');
+    assert.equal(m.owner.name, 'Ana');
+    assert.ok(!('email' in m.owner));
+  });
+
+  test('convidado cria, edita e exclui post-its na pasta; o dono vê tudo', async () => {
+    const n = (await call('/notes', { method: 'POST', token: beto.token, body: { title: 'Reservar hotel', folderId: folder.id } })).data.note;
+    assert.equal(n.ownerId, ana.user.id); // fica com a dona da pasta
+    assert.equal(n.createdBy, beto.user.id);
+    assert.ok((await call(`/notes?folder=${folder.id}`, { token: ana.token })).data.notes.some((x) => x.id === n.id));
+
+    assert.equal((await call(`/notes/${n.id}`, { method: 'PUT', token: beto.token, body: { title: 'Reservar hotel em Copacabana' } })).status, 200);
+    assert.equal((await call(`/notes/${n.id}/position`, { method: 'PATCH', token: beto.token, body: { x: 300, y: 300 } })).status, 200);
+
+    // busca do convidado acha post-its da pasta compartilhada
+    const s = await call('/notes/search?q=copacabana', { token: beto.token });
+    assert.equal(s.data.results[0].sharedBy, 'Ana');
+
+    // excluir vai para a lixeira da dona; o convidado ainda consegue desfazer
+    await call(`/notes/${n.id}`, { method: 'DELETE', token: beto.token });
+    assert.ok((await call('/notes/trash', { token: ana.token })).data.notes.some((x) => x.id === n.id));
+    assert.equal((await call(`/notes/${n.id}/restore`, { method: 'POST', token: beto.token })).status, 200);
+  });
+
+  test('convidado não mexe na pasta em si nem leva post-its embora; intruso não vê nada', async () => {
+    const n = (await call('/notes', { method: 'POST', token: ana.token, body: { title: 'Roteiro', folderId: folder.id } })).data.note;
+    assert.equal((await call(`/folders/${folder.id}`, { method: 'PUT', token: beto.token, body: { name: 'Minha agora' } })).status, 404);
+    assert.equal((await call(`/folders/${folder.id}`, { method: 'DELETE', token: beto.token })).status, 404);
+    // mover para o Mural geral do Beto = outra dona → recusado
+    assert.equal((await call(`/notes/${n.id}/folder`, { method: 'PATCH', token: beto.token, body: { folderId: null } })).status, 403);
+
+    assert.equal((await call(`/notes?folder=${folder.id}`, { token: intruso.token })).status, 404);
+    assert.equal((await call(`/notes/${n.id}`, { method: 'PUT', token: intruso.token, body: { title: 'x' } })).status, 404);
+    assert.equal((await call(`/notes/${n.id}/image`, { token: intruso.token })).status, 404);
+    assert.equal((await call(`/live/folders/${folder.id}/cursor`, { method: 'POST', token: intruso.token, body: { x: 1, y: 1 } })).status, 404);
+  });
+
+  test('ao vivo: presença, cursor e aviso de mudança entre duas pessoas', async () => {
+    // abre o "ao vivo" como o navegador faz (fetch com Authorization, lendo o fluxo)
+    async function connect(token) {
+      const ctrl = new AbortController();
+      const res = await fetch(`${BASE}/live/folders/${folder.id}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal });
+      assert.equal(res.headers.get('content-type'), 'text/event-stream; charset=utf-8');
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      const queue = [];
+      (async () => {
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf('\n\n')) !== -1) {
+              const raw = buf.slice(0, i);
+              buf = buf.slice(i + 2);
+              const ev = /^event: (.+)$/m.exec(raw)?.[1];
+              const data = /^data: (.+)$/m.exec(raw)?.[1];
+              if (ev) queue.push({ ev, data: JSON.parse(data) });
+            }
+          }
+        } catch {}
+      })();
+      const next = async (name, ms = 3000) => {
+        const until = Date.now() + ms;
+        while (Date.now() < until) {
+          const idx = queue.findIndex((e) => e.ev === name);
+          if (idx !== -1) return queue.splice(idx, 1)[0].data;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        throw new Error(`não chegou o evento "${name}"`);
+      };
+      return { next, close: () => ctrl.abort() };
+    }
+
+    const a = await connect(ana.token);
+    assert.equal((await a.next('hello')).presence.length, 1);
+    const b = await connect(beto.token);
+    const hb = await b.next('hello');
+    assert.equal(hb.presence.length, 2);
+    assert.deepEqual((await a.next('presence')).presence.map((p) => p.name).sort(), ['Ana', 'Beto']);
+
+    // cursor do Beto chega para a Ana (e não volta para ele mesmo)
+    await call(`/live/folders/${folder.id}/cursor`, { method: 'POST', token: beto.token, body: { x: 420, y: 230 } });
+    const cur = await a.next('cursor');
+    assert.deepEqual([cur.name, cur.x, cur.y], ['Beto', 420, 230]);
+
+    // Beto cria um post-it → Ana recebe aviso para recarregar
+    await call('/notes', { method: 'POST', token: beto.token, body: { title: 'Comprar protetor', folderId: folder.id } });
+    assert.equal((await a.next('notes')).by, beto.user.id);
+
+    // Beto sai da pasta → conexão dele fecha e ele perde o acesso
+    b.close();
+    assert.equal((await a.next('cursor-leave')).userId, beto.user.id);
+    await call(`/folders/${folder.id}/members/${beto.user.id}`, { method: 'DELETE', token: beto.token });
+    assert.equal((await call(`/notes?folder=${folder.id}`, { token: beto.token })).status, 404);
+    a.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Lembretes com horário, aviso antecipado e calendário', () => {
+  let token;
+  before(async () => ({ token } = await newUser()));
+
+  test('valida horário, aviso e repetição', async () => {
+    for (const extra of [{ eventTime: '25:00' }, { eventTime: '9h' }, { remindBefore: 7 }, { repeat: 'diario' }]) {
+      const r = await call('/notes', { method: 'POST', token, body: { title: 'x', eventDate: today(), eventType: 'event', ...extra } });
+      assert.equal(r.status, 400, JSON.stringify(extra));
+    }
+    const ok = await call('/notes', {
+      method: 'POST',
+      token,
+      body: { title: 'Aluguel', eventDate: today(), eventType: 'reminder', eventTime: '09:30', remindBefore: 1440, repeat: 'monthly' },
+    });
+    assert.equal(ok.data.note.eventTime, '09:30');
+    assert.equal(ok.data.note.repeat, 'monthly');
+    // aniversário sempre anual, mesmo pedindo outra coisa
+    const b = await call('/notes', { method: 'POST', token, body: { title: 'Niver', eventDate: '2000-03-10', eventType: 'birthday', repeat: 'weekly' } });
+    assert.equal(b.data.note.repeat, 'yearly');
+  });
+
+  test('alertas: "chegou a hora", "aviso antecipado" e fechar cada etapa', async () => {
+    const due = (await call('/notes', { method: 'POST', token, body: { title: 'Já passou da hora', eventDate: today(), eventType: 'event', eventTime: '00:00' } })).data.note;
+    const soon = (await call('/notes', { method: 'POST', token, body: { title: 'Amanhã cedo', eventDate: addDays(today(), 1), eventType: 'event', eventTime: '08:00', remindBefore: 2880 } })).data.note;
+    const later = (await call('/notes', { method: 'POST', token, body: { title: 'Daqui a 3 dias', eventDate: addDays(today(), 3), eventType: 'event', eventTime: '10:00' } })).data.note;
+
+    let r = (await call('/alerts', { token })).data;
+    const dueAlert = r.alerts.find((n) => n.id === due.id);
+    const soonAlert = r.alerts.find((n) => n.id === soon.id);
+    assert.equal(dueAlert.alertStage, 'due');
+    assert.equal(soonAlert.alertStage, 'soon');
+    assert.ok(soonAlert.minutesUntil > 0);
+    assert.ok(r.upcoming.some((n) => n.id === later.id));
+    assert.ok(!r.alerts.some((n) => n.id === later.id));
+
+    await call(`/alerts/${soon.id}/dismiss`, { method: 'POST', token, body: { key: soonAlert.alertKey } });
+    r = (await call('/alerts', { token })).data;
+    assert.ok(!r.alerts.some((n) => n.id === soon.id));
+    assert.equal((await call(`/alerts/${soon.id}/dismiss`, { method: 'POST', token, body: { key: 'qualquer' } })).status, 400);
+  });
+
+  test('calendário do mês mostra as ocorrências, inclusive repetidas', async () => {
+    const month = today().slice(0, 7);
+    const first = `${month}-01`;
+    await call('/notes', { method: 'POST', token, body: { title: 'Toda semana', eventDate: first, eventType: 'reminder', repeat: 'weekly', color: 'green' } });
+    const r = (await call(`/calendar?month=${month}`, { token })).data;
+    const days = Object.entries(r.days).filter(([, list]) => list.some((n) => n.title === 'Toda semana')).map(([d]) => d);
+    assert.ok(days.length >= 4 && days.length <= 5);
+    assert.ok(days.every((d) => d.startsWith(month)));
+    assert.equal((await call('/calendar?month=2026-13', { token })).status, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Busca com filtros e por data', () => {
+  let token, folder;
+  before(async () => {
+    ({ token } = await newUser());
+    folder = (await call('/folders', { method: 'POST', token, body: { name: 'Trabalho' } })).data.folder;
+    await call('/notes', { method: 'POST', token, body: { title: 'Relatório', color: 'blue', tags: ['urgente'], folderId: folder.id } });
+    await call('/notes', { method: 'POST', token, body: { title: 'Relatório pessoal', color: 'pink' } });
+    await call('/notes', { method: 'POST', token, body: { title: 'Natal', eventDate: '2026-12-25', eventType: 'event', color: 'green' } });
+    await call('/notes', { method: 'POST', token, body: { title: 'Niver Bia', eventDate: '1999-12-03', eventType: 'birthday' } });
+  });
+  const s = async (qs) => (await call(`/notes/search?${qs}`, { token })).data;
+
+  test('filtros por cor, pasta, etiqueta e "só com data" (com ou sem texto)', async () => {
+    assert.deepEqual((await s('q=relatorio&color=blue')).results.map((n) => n.title), ['Relatório']);
+    assert.deepEqual((await s(`q=relatorio&folder=${folder.id}`)).results.map((n) => n.title), ['Relatório']);
+    assert.deepEqual((await s('q=relatorio&folder=root')).results.map((n) => n.title), ['Relatório pessoal']);
+    assert.deepEqual((await s('tag=urgente')).results.map((n) => n.title), ['Relatório']);
+    assert.deepEqual((await s('hasDate=1')).results.map((n) => n.title).sort(), ['Natal', 'Niver Bia']);
+    assert.deepEqual((await call('/notes/tags', { token })).data.tags, [{ tag: 'urgente', uses: 1 }]);
+  });
+
+  test('busca por "dezembro" e por "25/12" (conta aniversário que repete)', async () => {
+    const dez = await s('q=dezembro');
+    assert.equal(dez.dateLabel, `dezembro de ${today().slice(0, 4)}`);
+    assert.deepEqual(dez.results.map((n) => n.title).sort(), ['Natal', 'Niver Bia']);
+    assert.deepEqual((await s(`q=${encodeURIComponent('25/12/2026')}`)).results.map((n) => n.title), ['Natal']);
+    assert.deepEqual((await s('q=niver%20dezembro')).results.map((n) => n.title), ['Niver Bia']);
   });
 });
 

@@ -16,10 +16,10 @@ export default function AlertModal({ alerts, onDismiss, calm = false }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {current.eventType === 'birthday' && <Confetti count={calm ? 25 : 90} />}
+          {current.eventType === 'birthday' && current.alertStage !== 'soon' && <Confetti count={calm ? 25 : 90} />}
 
           <motion.div
-            key={current.id}
+            key={`${current.id}-${current.alertKey}`}
             className={`alert-card postit-${current.color}`}
             role="alertdialog"
             aria-labelledby="alert-title"
@@ -39,7 +39,7 @@ export default function AlertModal({ alerts, onDismiss, calm = false }) {
               animate={{ y: [0, -14, 0], rotate: [0, -10, 10, 0] }}
               transition={{ repeat: Infinity, duration: 1.6 }}
             >
-              {current.eventType === 'birthday' ? '🎉' : eventIcon(current.eventType)}
+              {current.alertStage === 'soon' ? '🔔' : current.eventType === 'birthday' ? '🎉' : eventIcon(current.eventType)}
             </motion.div>
 
             <p className="alert-kicker">{alertHeadline(current)}</p>
@@ -51,12 +51,12 @@ export default function AlertModal({ alerts, onDismiss, calm = false }) {
 
             <motion.button
               className="btn-dark"
-              onClick={() => onDismiss(current.id)}
+              onClick={() => onDismiss(current)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               autoFocus
             >
-              {current.eventType === 'birthday' ? 'Vou dar os parabéns! 🥳' : 'Ok, entendi!'}
+              {current.alertStage === 'soon' ? 'Ok, me lembro!' : current.eventType === 'birthday' ? 'Vou dar os parabéns! 🥳' : 'Ok, entendi!'}
             </motion.button>
             {alerts.length > 1 && <small>+{alerts.length - 1} alerta(s) hoje</small>}
           </motion.div>

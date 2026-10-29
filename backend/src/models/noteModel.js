@@ -13,11 +13,22 @@ const parseJson = (s, fallback) => {
   }
 };
 
+// Alertas fechados: lista de chaves "AAAA-MM-DD:etapa" (etapa = soon | due).
+// Bancos antigos guardavam só a data do dia em que o alerta foi fechado.
+function parseDismissed(value) {
+  if (!value) return [];
+  if (value.startsWith('[')) return parseJson(value, []);
+  return [`${value}:due`];
+}
+
 // Converte a linha do banco (snake_case) para o formato que a API devolve
 function toNote(row) {
   if (!row) return null;
+  const repeat = row.repeat_rule ?? (row.repeat_yearly ? 'yearly' : 'none');
   return {
     id: row.id,
+    ownerId: row.user_id,
+    createdBy: row.created_by ?? row.user_id,
     folderId: row.folder_id ?? null,
     title: row.title,
     content: row.content,
@@ -36,13 +47,18 @@ function toNote(row) {
     deletedAt: row.deleted_at ?? null,
     archivedAt: row.archived_at ?? null,
     eventDate: row.event_date,
+    eventTime: row.event_time ?? null,
     eventType: row.event_type,
-    repeatYearly: Boolean(row.repeat_yearly),
-    dismissedOn: row.dismissed_on,
+    remindBefore: row.remind_before ?? 0,
+    repeat,
+    repeatYearly: repeat === 'yearly',
+    dismissed: parseDismissed(row.dismissed_on),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+const inShared = (ids) => (ids.length ? `OR n.folder_id IN (${ids.map(() => '?').join(',')})` : '');
 
 // Todas as consultas já dizem se o post-it tem foto
 const SELECT = `SELECT n.*, EXISTS(SELECT 1 FROM note_images i WHERE i.note_id = n.id) AS has_image FROM notes n`;
@@ -56,12 +72,24 @@ export const NoteModel = {
       .map(toNote);
   },
 
-  // Para a busca: ativos e arquivados (a lixeira fica de fora)
-  listSearchable(userId) {
+  // Para a busca: ativos e arquivados (a lixeira fica de fora), meus e das pastas compartilhadas comigo
+  listSearchable(userId, sharedFolderIds = []) {
     return db
-      .prepare(`${SELECT} WHERE n.user_id = ? AND n.deleted_at IS NULL ORDER BY n.updated_at DESC`)
-      .all(userId)
+      .prepare(`${SELECT} WHERE n.deleted_at IS NULL AND (n.user_id = ? ${inShared(sharedFolderIds)}) ORDER BY n.updated_at DESC`)
+      .all(userId, ...sharedFolderIds)
       .map(toNote);
+  },
+
+  // Para o calendário: post-its ativos com data, meus e das pastas compartilhadas comigo
+  listDatedVisible(userId, sharedFolderIds = []) {
+    return db
+      .prepare(`${SELECT} WHERE n.event_date IS NOT NULL AND ${ACTIVE} AND (n.user_id = ? ${inShared(sharedFolderIds)})`)
+      .all(userId, ...sharedFolderIds)
+      .map(toNote);
+  },
+
+  findAnyById(id) {
+    return toNote(db.prepare(`${SELECT} WHERE n.id = ?`).get(id));
   },
 
   listArchived(userId) {
@@ -116,8 +144,9 @@ export const NoteModel = {
     const result = db
       .prepare(
         `INSERT INTO notes (user_id, folder_id, title, content, color, pos_x, pos_y, rotation, z_index,
-                            width, height, pinned, checklist, tags, event_date, event_type, repeat_yearly)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            width, height, pinned, checklist, tags, event_date, event_type, repeat_yearly,
+                            event_time, remind_before, repeat_rule, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         userId,
@@ -136,18 +165,23 @@ export const NoteModel = {
         JSON.stringify(n.tags ?? []),
         n.eventDate,
         n.eventType,
-        n.repeatYearly ? 1 : 0,
+        n.repeat === 'yearly' ? 1 : 0,
+        n.eventTime ?? null,
+        n.remindBefore ?? 0,
+        n.repeat ?? 'none',
+        n.createdBy ?? userId,
       );
     return this.findById(userId, Number(result.lastInsertRowid));
   },
 
   update(userId, id, n) {
-    // Mudou a data? Então o alerta volta a valer.
+    // Mudou data, hora ou aviso? Então os alertas voltam a valer.
     db.prepare(
       `UPDATE notes
           SET title = ?, content = ?, color = ?, checklist = ?, tags = ?,
-              event_date = ?, event_type = ?, repeat_yearly = ?,
-              dismissed_on = CASE WHEN event_date IS ? THEN dismissed_on ELSE NULL END,
+              dismissed_on = CASE WHEN event_date IS ? AND event_time IS ? AND remind_before = ? AND repeat_rule IS ?
+                                  THEN dismissed_on ELSE NULL END,
+              event_date = ?, event_type = ?, repeat_yearly = ?, event_time = ?, remind_before = ?, repeat_rule = ?,
               updated_at = datetime('now')
         WHERE id = ? AND user_id = ?`,
     ).run(
@@ -157,9 +191,15 @@ export const NoteModel = {
       JSON.stringify(n.checklist),
       JSON.stringify(n.tags),
       n.eventDate,
-      n.eventType,
-      n.repeatYearly ? 1 : 0,
+      n.eventTime ?? null,
+      n.remindBefore ?? 0,
+      n.repeat ?? 'none',
       n.eventDate,
+      n.eventType,
+      n.repeat === 'yearly' ? 1 : 0,
+      n.eventTime ?? null,
+      n.remindBefore ?? 0,
+      n.repeat ?? 'none',
       id,
       userId,
     );
@@ -211,8 +251,12 @@ export const NoteModel = {
     return this.findById(userId, id);
   },
 
-  dismiss(userId, id, day) {
-    db.prepare('UPDATE notes SET dismissed_on = ? WHERE id = ? AND user_id = ?').run(day, id, userId);
+  // Guarda que o alerta "AAAA-MM-DD:etapa" foi fechado (mantém só os mais recentes)
+  dismiss(userId, id, key) {
+    const note = this.findById(userId, id);
+    if (!note) return null;
+    const keys = [...new Set([...note.dismissed, key])].slice(-12);
+    db.prepare('UPDATE notes SET dismissed_on = ? WHERE id = ? AND user_id = ?').run(JSON.stringify(keys), id, userId);
     return this.findById(userId, id);
   },
 

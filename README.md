@@ -67,7 +67,7 @@ navegador mostra **"Sua conexão não é particular"**. Para o cadeado aparecer 
 
 ## 🧪 Testes
 
-- `npm test` na pasta `backend`: 37 testes automáticos da API (usam um banco temporário).
+- `npm test` na pasta `backend`: 51 testes automáticos da API (usam um banco temporário).
 - Relatório completo dos testes de PC e celular: [TESTES.md](TESTES.md).
 
 ## 📱 Usar no celular (mesma rede Wi-Fi)
@@ -125,12 +125,37 @@ Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede qu
 - **▦ Arrumar:** organiza a pasta em grade com animação (fixados primeiro).
 - **Zoom:** – 100% + no canto (ou Ctrl + rodinha do mouse), de 40% a 160%.
 
+## 👥 Pastas organizadas e compartilhadas
+
+- **Subpastas** (até 3 níveis: Faculdade › Cálculo › Provas), **cor** de cada pasta e **ordem**
+  (arraste a alça ⠿ no seletor de pastas). O topo mostra o caminho: "Faculdade › Cálculo".
+- **Arrastar o post-it até uma pasta:** ao começar a arrastar aparece uma faixa com as pastas no alto
+  da tela; solte em cima de uma para mover (com Desfazer). No celular: menu ⋯ → "Mover para pasta…".
+- **Compartilhar (👥):** convide alguém pelo e-mail (a pessoa precisa ter conta). Quem foi convidado vê
+  e edita os post-its daquela pasta, que aparece em "Compartilhadas comigo". Só quem criou renomeia,
+  apaga ou convida; o convidado pode sair quando quiser.
+- **Ao vivo, como no Miro:** com a pasta aberta, cada pessoa vê o **cursor das outras com o nome**,
+  as bolinhas de quem está na pasta agora e os post-its mudando na hora (sem recarregar).
+  Funciona com Server-Sent Events (uma conexão aberta do servidor para o navegador), sem bibliotecas extras.
+
+## 📅 Lembretes, repetição e calendário
+
+- **Horário opcional** ("Reunião às 14:00") e **aviso antecipado**: 15/30 min, 1/2 h, 1 ou 2 dias ou
+  1 semana antes. O alerta aparece duas vezes: no aviso ("🔔 Daqui a 1 h") e na hora.
+- **Repetição:** toda semana, todo mês ("todo dia 5" — dia 31 vira o último dia do mês) ou todo ano.
+- **📅 Calendário do mês** (botão no topo): pontinhos coloridos nos dias com post-its, contando as
+  repetições; clique no dia para ver a lista e abrir o post-it.
+- **Adicionar ao Google Agenda:** no menu ⋯ do post-it ou na lista do calendário (já vai com a repetição).
+
 ## 📁 Pastas e 🔍 busca (para quem escreve muito)
 
 - **Pastas:** o botão com o nome da pasta, no topo, abre a lista. Cada pasta é um mural separado
   (ex.: *Trabalho*, *Faculdade*, *Viagem para o Rio*). Você escolhe o nome e um ícone, pode renomear
   (✏️) e apagar (🗑️ — os post-its dela voltam para o **Mural geral**, nada se perde).
   Para mudar um post-it de pasta, edite-o e troque o campo **Pasta**. O app lembra a última pasta aberta.
+- **Filtros da busca:** cor, pasta, etiqueta e "só os que têm data" (dá para usar sem digitar nada).
+  **Busca por data:** "outubro", "dezembro 2026", "25/12", "hoje", "amanhã" (conta repetições).
+  **Buscas recentes** ficam salvas no navegador.
 - **Busca (lupa ou Ctrl + K / "/"):** procura palavras no título e no texto de **todas as pastas**,
   sem ligar para acentos ("reuniao" acha "Reunião"). Mostra o trecho onde a palavra aparece e de qual
   pasta é. Ao escolher um resultado, o mural troca para a pasta certa, rola até o post-it e ele
@@ -215,6 +240,13 @@ A chave fica **só no backend**, nunca vai para o navegador.
 | GET/PUT/DELETE | `/notes/:id/image` | Foto do post-it                          |
 | POST   | `/notes/batch`           | Mover/fixar/arquivar/excluir vários        |
 | POST   | `/notes/arrange`         | Arrumar a pasta em grade                   |
+| PUT    | `/folders/order`         | Nova ordem das pastas de um nível          |
+| GET/POST | `/folders/:id/members` | Quem participa / convidar por e-mail       |
+| DELETE | `/folders/:id/members/:userId` | Tirar alguém ou sair da pasta        |
+| GET    | `/live/folders/:id`      | "Ao vivo" (SSE): presença, cursores, mudanças |
+| POST   | `/live/folders/:id/cursor` | Posição do meu cursor                    |
+| GET    | `/calendar?month=AAAA-MM` | Post-its com data em cada dia do mês      |
+| GET    | `/notes/tags`            | Etiquetas usadas (filtro da busca)         |
 | GET    | `/alerts`                | Alertas de hoje + próximos 7 dias          |
 | POST   | `/alerts/:id/dismiss`    | Fecha o alerta (não aparece mais hoje)     |
 | GET    | `/settings`              | Configurações do usuário                   |

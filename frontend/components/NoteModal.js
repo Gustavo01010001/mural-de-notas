@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { COLORS, EVENT_TYPES } from '@/lib/format';
+import { COLORS, EVENT_TYPES, REMIND_OPTIONS, REPEAT_OPTIONS, repeatLabel } from '@/lib/format';
 import { compressImage, parseTagInput, tagColor } from '@/lib/noteHelpers';
 import { noteImageUrl } from '@/lib/api';
 
@@ -14,8 +14,10 @@ const EMPTY = {
   tags: [],
   hasDate: false,
   eventDate: '',
+  eventTime: '',
   eventType: 'birthday',
-  repeatYearly: true,
+  remindBefore: 0,
+  repeat: 'yearly',
 };
 
 const newItemId = () => `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -31,12 +33,14 @@ function fromNote(note, defaultColor, currentFolder) {
     tags: note.tags ?? [],
     hasDate: Boolean(note.eventDate),
     eventDate: note.eventDate ?? '',
+    eventTime: note.eventTime ?? '',
     eventType: note.eventType ?? 'birthday',
-    repeatYearly: note.eventDate ? note.repeatYearly : true,
+    remindBefore: note.remindBefore ?? 0,
+    repeat: note.eventDate ? note.repeat ?? 'none' : 'yearly',
   };
 }
 
-export default function NoteModal({ open, note, defaultColor, folders = [], currentFolder = null, onClose, onSave }) {
+export default function NoteModal({ open, note, defaultColor, folders = [], currentFolder = null, sharedLocked = false, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [newItem, setNewItem] = useState('');
@@ -117,7 +121,10 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
         tags: [...new Set([...form.tags, ...pendingTags])],
         eventDate: form.hasDate ? form.eventDate : null,
         eventType: form.hasDate ? form.eventType : null,
-        repeatYearly: form.hasDate && (form.eventType === 'birthday' || form.repeatYearly),
+        eventTime: form.hasDate && form.eventTime ? form.eventTime : null,
+        // sem horário, aviso só em dias (1 dia, 2 dias, 1 semana)
+        remindBefore: form.hasDate && (form.eventTime || form.remindBefore >= 1440) ? form.remindBefore : 0,
+        repeat: form.hasDate ? (form.eventType === 'birthday' ? 'yearly' : form.repeat) : 'none',
       },
       image,
     );
@@ -295,11 +302,15 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                 <span>📁 Pasta</span>
                 <select
                   value={form.folderId ?? ''}
+                  disabled={sharedLocked}
+                  title={sharedLocked ? 'Post-its de uma pasta compartilhada ficam nela' : undefined}
                   onChange={(e) => setForm((f) => ({ ...f, folderId: e.target.value ? Number(e.target.value) : null }))}
                 >
-                  <option value="">📌 Mural geral</option>
+                  {!sharedLocked && <option value="">📌 Mural geral</option>}
                   {folders.map((f) => (
                     <option key={f.id} value={f.id}>
+                      {'  '.repeat((f.depth ?? 1) - 1)}
+                      {(f.depth ?? 1) > 1 ? '└ ' : ''}
                       {f.icon} {f.name}
                     </option>
                   ))}
@@ -329,21 +340,65 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                         key={t.id}
                         type="button"
                         className={`type-chip ${form.eventType === t.id ? 'selected' : ''}`}
-                        onClick={() => setForm((f) => ({ ...f, eventType: t.id }))}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            eventType: t.id,
+                            // saiu de "aniversário": volta para "não repetir"
+                            repeat: t.id === 'birthday' ? 'yearly' : f.eventType === 'birthday' ? 'none' : f.repeat,
+                          }))
+                        }
                       >
                         {t.icon} {t.label}
                       </button>
                     ))}
                   </div>
-                  <input type="date" value={form.eventDate} onChange={set('eventDate')} />
-                  {form.eventType === 'birthday' ? (
-                    <small>🎂 Aniversários são lembrados todo ano automaticamente.</small>
-                  ) : (
-                    <label className="check">
-                      <input type="checkbox" checked={form.repeatYearly} onChange={set('repeatYearly')} />
-                      Repetir todo ano
+                  <div className="date-row">
+                    <label className="date-field">
+                      <span>Dia</span>
+                      <input type="date" value={form.eventDate} onChange={set('eventDate')} />
                     </label>
-                  )}
+                    <label className="date-field">
+                      <span>Horário (opcional)</span>
+                      <span className="time-wrap">
+                        <input type="time" value={form.eventTime} onChange={set('eventTime')} />
+                        {form.eventTime && (
+                          <button type="button" className="icon-mini" onClick={() => setForm((f) => ({ ...f, eventTime: '' }))} aria-label="Tirar horário">
+                            ✕
+                          </button>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                  <div className="date-row">
+                    <label className="date-field">
+                      <span>🔔 Avisar</span>
+                      <select value={form.remindBefore} onChange={(e) => setForm((f) => ({ ...f, remindBefore: Number(e.target.value) }))}>
+                        {REMIND_OPTIONS.filter((o) => form.eventTime || o.id === 0 || o.id >= 1440).map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.id === 0 ? (form.eventTime ? 'Na hora' : 'No dia') : o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="date-field">
+                      <span>🔁 Repetir</span>
+                      {form.eventType === 'birthday' ? (
+                        <select value="yearly" disabled>
+                          <option value="yearly">Todo ano 🎂</option>
+                        </select>
+                      ) : (
+                        <select value={form.repeat} onChange={set('repeat')}>
+                          {REPEAT_OPTIONS.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.id === 'weekly' && form.eventDate ? repeatLabel({ repeat: 'weekly', eventDate: form.eventDate }).replace(/^./, (c) => c.toUpperCase()) : o.id === 'monthly' && form.eventDate ? `Todo dia ${Number(form.eventDate.slice(8))}` : o.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </label>
+                  </div>
+                  {form.eventType === 'birthday' && <small>🎂 Aniversários são lembrados todo ano automaticamente.</small>}
                 </motion.div>
               )}
             </AnimatePresence>

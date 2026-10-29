@@ -1,0 +1,783 @@
+/* =====================================================================
+   Pastas: árvore, cor, ordem, compartilhamento
+   ===================================================================== */
+.folder-level {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.folder-item {
+  position: relative;
+  list-style: none;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.folder-row[style*='--depth'] {
+  padding-left: calc(var(--depth) * 18px);
+}
+
+.folder-handle {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  color: var(--muted);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+
+.folder-row:hover .folder-handle {
+  opacity: 0.7;
+}
+
+.folder-handle.placeholder,
+.folder-chevron.placeholder {
+  cursor: default;
+}
+
+.folder-chevron {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+}
+
+.folder-chevron.open {
+  transform: rotate(90deg);
+}
+
+span.folder-chevron.placeholder {
+  display: inline-block;
+}
+
+.folder-swatch {
+  flex-shrink: 0;
+  width: 4px;
+  height: 20px;
+  border-radius: 4px;
+  margin-right: -2px;
+}
+
+.folder-color-yellow,
+.folder-tint-yellow { --fc: var(--yellow-2); }
+.folder-color-pink,
+.folder-tint-pink { --fc: var(--pink-2); }
+.folder-color-blue,
+.folder-tint-blue { --fc: var(--blue-2); }
+.folder-color-green,
+.folder-tint-green { --fc: var(--green-2); }
+.folder-color-orange,
+.folder-tint-orange { --fc: var(--orange-2); }
+.folder-color-purple,
+.folder-tint-purple { --fc: var(--purple-2); }
+
+.folder-swatch[class*='folder-color-'] {
+  background: var(--fc);
+}
+
+.folder-editor-icon[class*='folder-color-'] {
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fc) 35%, transparent);
+}
+
+.folder-trigger[class*='folder-tint-'] {
+  border-left: 4px solid var(--fc, transparent);
+}
+
+.folder-crumbs {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.folder-shared-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(77, 171, 247, 0.18);
+  color: #a5d8ff;
+  font-size: 0.7rem;
+}
+
+.folder-owner {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.folder-sub-editor {
+  padding-left: calc(var(--depth) * 18px + 20px);
+}
+
+.folder-editor-colors {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.color-dot.small {
+  width: 22px;
+  height: 22px;
+}
+
+.folder-editor-parent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.folder-editor-parent select,
+.date-field select,
+.sf-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.folder-panel {
+  width: 360px;
+}
+
+/* ----- compartilhar ----- */
+.share-modal {
+  width: min(520px, 100%);
+  max-height: min(84vh, 680px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background: rgba(18, 18, 26, 0.97);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.share-body {
+  padding: 14px 18px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.share-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.share-invite {
+  display: flex;
+  gap: 8px;
+}
+
+.share-invite input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  outline: none;
+}
+
+.share-invite input:focus {
+  border-color: var(--accent);
+}
+
+.share-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.share-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.share-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.share-name em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.8rem;
+}
+
+.share-name small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.share-role {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #4dabf7;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  border: 2px solid rgba(0, 0, 0, 0.4);
+}
+
+.avatar.mini {
+  width: 28px;
+  height: 28px;
+  font-size: 0.68rem;
+  margin-left: -8px;
+  overflow: hidden;
+}
+
+.avatar.mini.more {
+  background: #495057;
+}
+
+/* ----- quem está na pasta agora ----- */
+.presence-bar {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 12px 0 10px;
+  border-radius: 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px);
+  color: var(--text);
+  gap: 2px;
+}
+
+.presence-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background: #868e96;
+}
+
+.presence-bar.on .presence-dot {
+  background: #51cf66;
+  box-shadow: 0 0 0 0 rgba(81, 207, 102, 0.6);
+  animation: live-pulse 2s infinite;
+}
+
+@keyframes live-pulse {
+  70% {
+    box-shadow: 0 0 0 8px rgba(81, 207, 102, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(81, 207, 102, 0);
+  }
+}
+
+.board.calm .presence-bar.on .presence-dot {
+  animation: none;
+}
+
+.presence-label {
+  margin-left: -4px;
+}
+
+/* ----- cursores ao vivo (como no Miro) ----- */
+.live-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100000;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.live-cursor-name {
+  margin: 16px 0 0 -4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--c);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ----- faixa para soltar o post-it numa pasta ----- */
+.drop-dock {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  z-index: 100001;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: min(900px, calc(100% - 24px));
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(18, 18, 26, 0.95);
+  border: 1px dashed rgba(255, 216, 77, 0.55);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.drop-dock-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-right: 4px;
+}
+
+.drop-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid transparent;
+  border-left: 4px solid var(--fc, rgba(255, 255, 255, 0.2));
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.drop-target small {
+  color: var(--muted);
+}
+
+.drop-target.hover {
+  background: rgba(255, 216, 77, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* =====================================================================
+   Datas: horário, aviso, repetição e calendário
+   ===================================================================== */
+.date-row {
+  display: flex;
+  gap: 10px;
+}
+
+.date-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.note-modal .date-field select {
+  background: rgba(255, 255, 255, 0.55);
+  color: #222;
+  border: 2px solid transparent;
+}
+
+.time-wrap {
+  display: flex;
+  gap: 6px;
+}
+
+.time-wrap input {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-panel {
+  width: min(560px, 100%);
+  max-height: min(90vh, 820px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background: rgba(18, 18, 26, 0.97);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+.calendar-head h2 {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 12px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding-bottom: 4px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.calendar-day:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-day.has {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.calendar-day.today .calendar-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #1a1a1a;
+  font-weight: 800;
+}
+
+.calendar-day.selected {
+  border-color: var(--accent);
+}
+
+.calendar-num {
+  font-size: 0.9rem;
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 3px;
+  min-height: 6px;
+}
+
+.calendar-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.calendar-list {
+  padding: 4px 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-list h3 {
+  margin: 4px 0 2px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.calendar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 6px 6px 6px 14px;
+  color: #222;
+}
+
+.calendar-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.calendar-item-main strong {
+  font-family: var(--font-hand), cursive;
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.calendar-item-main small {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.calendar-item .btn-ghost {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   Busca: filtros, recentes, exemplos
+   ===================================================================== */
+.search-filter-toggle {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.search-filter-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.search-filters {
+  overflow: hidden;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sf-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.sf-row > span:first-child {
+  width: 64px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sf-row select {
+  max-width: 260px;
+}
+
+.sf-tag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--tc);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.sf-tag.on {
+  background: var(--tc);
+  color: #fff;
+}
+
+.sf-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.sf-check input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.search-recent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.search-recent > span {
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.search-recent button:not(.btn-text),
+.search-example {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.search-example {
+  margin: 6px 3px 0;
+}
+
+.search-recent button:not(.btn-text):hover,
+.search-example:hover {
+  border-color: var(--accent);
+}
+
+.search-date-label {
+  margin: 8px 12px 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.search-date-label b {
+  color: var(--accent);
+}
+
+/* ----- celular ----- */
+@media (max-width: 720px) {
+  .presence-bar {
+    height: 44px;
+    padding: 0 8px;
+  }
+
+  .presence-bar .avatar.mini:nth-of-type(n + 3) {
+    display: none;
+  }
+
+  .folder-panel {
+    width: auto;
+  }
+
+  .folder-handle {
+    opacity: 0.6;
+  }
+
+  .drop-dock {
+    display: none; /* no celular não tem arrastar: usa "Mover para pasta…" */
+  }
+
+  .date-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+    padding: 8px;
+  }
+
+  .calendar-day {
+    border-radius: 9px;
+  }
+
+  .sf-row > span:first-child {
+    width: 100%;
+  }
+
+  .search-filter-toggle {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .presence-bar .avatar.mini {
+    display: none;
+  }
+
+  .presence-bar {
+    padding: 0 10px;
+  }
+
+  .presence-bar .presence-dot {
+    margin-right: 0;
+  }
+
+  .presence-label {
+    display: none;
+  }
+
+  /* topo apertado: botões um pouco menores para sobrar espaço para o nome da pasta */
+  .topbar {
+    gap: 6px;
+  }
+
+  .topbar .gear-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .folder-trigger {
+    height: 40px;
+    padding: 0 8px 0 10px;
+    gap: 6px;
+  }
+
+  .presence-bar {
+    height: 40px;
+  }
+
+  .folder-trigger .folder-count {
+    display: none;
+  }
+
+  .folder-crumbs {
+    display: none; /* no celular mostra só o nome da pasta aberta */
+  }
+}

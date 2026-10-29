@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, clearToken, getToken } from '@/lib/api';
-import { countdownLabel, eventIcon } from '@/lib/format';
+import { alertHeadline, countdownLabel, eventIcon } from '@/lib/format';
 import { tagColor } from '@/lib/noteHelpers';
 import { useToast } from '@/components/Toasts';
 import PostIt from '@/components/PostIt';
@@ -16,6 +16,11 @@ import SettingsPanel from '@/components/SettingsPanel';
 import FolderSwitcher from '@/components/FolderSwitcher';
 import SearchPalette from '@/components/SearchPalette';
 import TrashPanel from '@/components/TrashPanel';
+import ShareModal from '@/components/ShareModal';
+import CalendarPanel from '@/components/CalendarPanel';
+import { FolderDropDock, LiveCursors, PresenceBar } from '@/components/LiveLayer';
+import { useLiveFolder } from '@/lib/useLiveFolder';
+import { flattenTree } from '@/lib/folderTree';
 import { BoardTools, SelectionBar, ZOOM_MAX, ZOOM_MIN } from '@/components/BoardTools';
 import { useWeather } from '@/lib/useWeather';
 import { resolveScene } from '@/lib/scenes';
@@ -88,8 +93,15 @@ function restartSession() {
 
 function notifyBrowser(note) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  const title = note.eventType === 'birthday' ? '🎉 Aniversário hoje!' : '📌 Data importante hoje!';
-  new Notification(title, { body: note.title });
+  const title =
+    note.alertStage === 'soon'
+      ? `🔔 ${alertHeadline(note)}`
+      : note.eventType === 'birthday'
+        ? '🎉 Aniversário hoje!'
+        : note.eventTime
+          ? `⏰ Agora: ${note.eventTime}`
+          : '📌 Data importante hoje!';
+  new Notification(title, { body: note.title, tag: `${note.id}-${note.alertKey}` });
 }
 
 export default function BoardPage() {
@@ -118,6 +130,11 @@ export default function BoardPage() {
 
   // Pastas: null = Mural geral; undefined = ainda carregando
   const [folders, setFolders] = useState([]);
+  const [sharedFolders, setSharedFolders] = useState([]); // compartilhadas comigo
+  const [shareFolder, setShareFolder] = useState(null); // pasta aberta na janela "compartilhar"
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [dragNote, setDragNote] = useState(null); // post-it sendo arrastado (mostra a faixa de pastas)
+  const [dropHover, setDropHover] = useState(null);
   const [rootCount, setRootCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState(undefined);
   const [notesLoaded, setNotesLoaded] = useState(false);
@@ -176,18 +193,21 @@ export default function BoardPage() {
   const loadFolders = useCallback(async () => {
     const data = await api('/folders');
     setFolders(data.folders);
+    setSharedFolders(data.shared ?? []);
     setRootCount(data.rootCount);
     setSpecial({ archived: data.archivedCount ?? 0, trash: data.trashCount ?? 0 });
-    return data.folders;
+    return [...data.folders, ...(data.shared ?? [])];
   }, []);
 
   const loadAlerts = useCallback(async () => {
     const data = await api('/alerts');
     setAlerts(data.alerts);
     setUpcoming(data.upcoming);
+    // cada aviso ("1 dia antes", "na hora") notifica uma vez
     data.alerts.forEach((n) => {
-      if (!notified.current.has(n.id)) {
-        notified.current.add(n.id);
+      const key = `${n.id}:${n.alertKey}`;
+      if (!notified.current.has(key)) {
+        notified.current.add(key);
         notifyBrowser(n);
       }
     });
@@ -333,7 +353,102 @@ export default function BoardPage() {
     }
   }
 
-  const folderName = (id) => (id ? folders.find((f) => f.id === id)?.name : null) ?? 'Mural geral';
+  const folderName = (id) => (id ? [...folders, ...sharedFolders].find((f) => f.id === id)?.name : null) ?? 'Mural geral';
+
+  // Arrastar a alça ⠿ no seletor de pastas muda a ordem
+  async function handleReorderFolders(parentId, ids) {
+    setFolders((list) => list.map((f) => ((f.parentId ?? null) === parentId && ids.includes(f.id) ? { ...f, position: ids.indexOf(f.id) } : f)));
+    try {
+      const res = await api('/folders/order', { method: 'PUT', body: { parentId, ids } });
+      setFolders(res.folders);
+    } catch (err) {
+      handleAuthError(err);
+      loadFolders().catch(() => {});
+    }
+  }
+
+  // ----- pasta aberta: é minha ou compartilhada? -----
+  const currentInfo =
+    currentFolder === null || currentFolder === undefined
+      ? null
+      : folders.find((f) => f.id === currentFolder) ?? sharedFolders.find((f) => f.id === currentFolder) ?? null;
+  const isSharedWithMe = Boolean(currentInfo && sharedFolders.some((f) => f.id === currentInfo.id));
+  const liveEnabled = Boolean(currentInfo && (isSharedWithMe || currentInfo.memberCount > 0));
+
+  const notesReloadTimer = useRef(null);
+  const live = useLiveFolder(currentFolder, liveEnabled, {
+    // alguém mexeu nos post-its: recarrega (agrupando avisos seguidos)
+    onNotesChanged: () => {
+      clearTimeout(notesReloadTimer.current);
+      notesReloadTimer.current = setTimeout(() => {
+        if (folderRef.current !== undefined) loadNotes(folderRef.current).catch(() => {});
+        loadFolders().catch(() => {});
+      }, 250);
+    },
+    onFolderChanged: (removed) => {
+      loadFolders().catch(() => {});
+      if (removed) {
+        toast('Essa pasta foi apagada por quem criou.', 'info');
+        setCurrentFolder(null);
+      }
+    },
+    onKicked: () => {
+      toast('Você não tem mais acesso a essa pasta compartilhada.', 'info');
+      setCurrentFolder(null);
+      loadFolders().catch(() => {});
+    },
+  });
+
+  // ----- arrastar post-it até uma pasta -----
+  // Só pastas do mesmo dono (numa pasta compartilhada de outra pessoa não há para onde mover)
+  const dropTargets = isSharedWithMe
+    ? []
+    : [{ key: 'root', name: 'Mural geral', icon: '📌', depth: 1 }, ...flattenTree(folders).map((f) => ({ key: String(f.id), name: f.name, icon: f.icon, color: f.color, depth: f.depth }))].filter(
+        (t) => t.key !== String(currentFolder ?? 'root'),
+      );
+
+  useEffect(() => {
+    if (!dragNote) return;
+    const onMove = (e) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-drop-folder]');
+      setDropHover(el?.dataset.dropFolder ?? null);
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [dragNote]);
+
+  function handleDragStart(note) {
+    if (dropTargets.length) setDragNote(note);
+  }
+
+  // Soltou o post-it: se foi em cima de uma pasta da faixa, move para ela (com Desfazer)
+  function handleDrop(note, x, y) {
+    const el = dragNote ? document.elementFromPoint(x, y)?.closest?.('[data-drop-folder]') : null;
+    setDragNote(null);
+    setDropHover(null);
+    if (!el) return false;
+    const key = el.dataset.dropFolder;
+    const targetId = key === 'root' ? null : Number(key);
+    const from = note.folderId ?? null;
+    (async () => {
+      try {
+        const data = await api(`/notes/${note.id}/folder`, { method: 'PATCH', body: { folderId: targetId } });
+        dropFromBoard([note.id]);
+        loadFolders().catch(() => {});
+        offerUndo(data.message, async () => {
+          try {
+            await api(`/notes/${note.id}/folder`, { method: 'PATCH', body: { folderId: from } });
+            refreshAll();
+          } catch (err) {
+            handleAuthError(err);
+          }
+        }, 'move');
+      } catch (err) {
+        handleAuthError(err);
+      }
+    })();
+    return true;
+  }
 
   // Spotlight que segue o mouse no fundo preto
   useEffect(() => {
@@ -346,6 +461,23 @@ export default function BoardPage() {
     window.addEventListener('pointermove', onMove);
     return () => window.removeEventListener('pointermove', onMove);
   }, []);
+
+  // Pasta compartilhada: manda a posição do meu cursor em coordenadas do mural
+  // (assim aparece no lugar certo para os outros mesmo com zoom/rolagem diferentes)
+  const sendCursor = live.sendCursor;
+  const freeBoard = !(isMobile && settings.mobileLayout !== 'free');
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el || !liveEnabled || !freeBoard) return;
+    const onMove = (e) => {
+      if (e.pointerType === 'touch') return;
+      const x = (e.clientX + el.scrollLeft) / zoom;
+      const y = (e.clientY + el.scrollTop) / zoom;
+      sendCursor(Math.round(x), Math.round(y));
+    };
+    el.addEventListener('pointermove', onMove);
+    return () => el.removeEventListener('pointermove', onMove);
+  }, [liveEnabled, freeBoard, zoom, sendCursor]);
 
   const replaceNote = (note) => setNotes((list) => list.map((n) => (n.id === note.id ? note : n)));
 
@@ -411,10 +543,10 @@ export default function BoardPage() {
   }
 
   // Mostra um aviso com "Desfazer" (o mesmo desfazer também roda com Ctrl+Z por alguns segundos)
-  function offerUndo(message, undo) {
+  function offerUndo(message, undo, type = 'trash') {
     const entry = { undo, until: Date.now() + 7000 };
     lastUndo.current = entry;
-    toast(message, 'trash', {
+    toast(message, type, {
       action: {
         label: 'Desfazer',
         onClick: () => {
@@ -485,7 +617,7 @@ export default function BoardPage() {
         } catch (err) {
           handleAuthError(err);
         }
-      });
+      }, 'archive');
     } catch (err) {
       handleAuthError(err);
     }
@@ -637,10 +769,11 @@ export default function BoardPage() {
     });
   }
 
-  async function handleDismiss(id) {
-    setAlerts((list) => list.filter((n) => n.id !== id));
+  // Fecha só aquele aviso ("1 dia antes" e "na hora" são avisos diferentes)
+  async function handleDismiss(note) {
+    setAlerts((list) => list.filter((n) => !(n.id === note.id && n.alertKey === note.alertKey)));
     try {
-      await api(`/alerts/${id}/dismiss`, { method: 'POST' });
+      await api(`/alerts/${note.id}/dismiss`, { method: 'POST', body: { key: note.alertKey } });
     } catch (err) {
       handleAuthError(err);
     }
@@ -718,6 +851,8 @@ export default function BoardPage() {
   const closeModal = useCallback(() => setModal((m) => ({ ...m, open: false })), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const closeSpecial = useCallback(() => setSpecialPanel(null), []);
+  const closeCalendar = useCallback(() => setCalendarOpen(false), []);
+  const closeShare = useCallback(() => setShareFolder(null), []);
 
   // No celular, por padrão, os post-its viram uma grade que cabe na tela (sem rolar para o lado)
   const gridMode = isMobile && settings.mobileLayout !== 'free';
@@ -770,17 +905,38 @@ export default function BoardPage() {
         {currentFolder !== undefined && (
           <FolderSwitcher
             folders={folders}
+            shared={sharedFolders}
             rootCount={rootCount}
             current={currentFolder}
             onSelect={setCurrentFolder}
             onCreate={handleCreateFolder}
             onRename={handleRenameFolder}
             onDelete={handleDeleteFolder}
+            onReorder={handleReorderFolders}
+            onShare={setShareFolder}
             archivedCount={special.archived}
             trashCount={special.trash}
             onOpenSpecial={setSpecialPanel}
           />
         )}
+        {liveEnabled && (
+          <PresenceBar presence={live.presence} meId={user?.id} connected={live.connected} onOpen={() => setShareFolder(currentInfo)} />
+        )}
+        <motion.button
+          className="gear-btn"
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Calendário"
+          title="Calendário do mês"
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+            <path
+              fill="currentColor"
+              d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm12 8H5v9h14v-9zM5 8h14V6H5v2zm2 4h3v3H7v-3z"
+            />
+          </svg>
+        </motion.button>
         <motion.button
           className="gear-btn search-btn"
           onClick={() => setSearchOpen(true)}
@@ -862,9 +1018,12 @@ export default function BoardPage() {
                   onToggleCheck={handleToggleCheck}
                   onTagClick={(t) => setTagFilter((cur) => (cur === t ? null : t))}
                   onSelect={toggleSelect}
+                  onDragStart={handleDragStart}
+                  onDrop={handleDrop}
                 />
               ))}
             </AnimatePresence>
+            {liveEnabled && !gridMode && <LiveCursors cursors={live.cursors} />}
           </div>
         </motion.div>
       </AnimatePresence>
@@ -904,7 +1063,8 @@ export default function BoardPage() {
       <SelectionBar
         count={selecting ? selection.size : null}
         total={visibleNotes.length}
-        folders={folders}
+        folders={isSharedWithMe ? [] : flattenTree(folders)}
+        canMove={!isSharedWithMe}
         currentFolder={currentFolder ?? null}
         onSelectAll={() => setSelection(new Set(visibleNotes.map((n) => n.id)))}
         onMove={(folderId) => runBatch('move', { folderId })}
@@ -1007,12 +1167,40 @@ export default function BoardPage() {
         open={modal.open}
         note={modal.note}
         defaultColor={settings.defaultColor}
-        folders={folders}
+        folders={isSharedWithMe ? [{ ...currentInfo, depth: 1 }] : flattenTree(folders)}
+        sharedLocked={isSharedWithMe}
         currentFolder={currentFolder ?? null}
         onClose={closeModal}
         onSave={handleSave}
       />
-      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} onPick={handlePick} />
+      <SearchPalette
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onPick={handlePick}
+        folders={[...flattenTree(folders), ...sharedFolders.map((f) => ({ ...f, depth: 1 }))]}
+      />
+      <CalendarPanel
+        open={calendarOpen}
+        onClose={closeCalendar}
+        onAuthError={handleAuthError}
+        onPick={(it) => {
+          setCalendarOpen(false);
+          handlePick(it);
+        }}
+      />
+      <ShareModal
+        folder={shareFolder}
+        me={user}
+        onClose={closeShare}
+        onChanged={() => loadFolders().catch(() => {})}
+        onLeft={(id) => {
+          if (currentFolder === id) setCurrentFolder(null);
+          loadFolders().catch(() => {});
+        }}
+        toast={toast}
+        onAuthError={handleAuthError}
+      />
+      <AnimatePresence>{dragNote && !gridMode && <FolderDropDock targets={dropTargets} hoverId={dropHover} />}</AnimatePresence>
       <TrashPanel
         mode={specialPanel}
         onClose={closeSpecial}

@@ -79,11 +79,37 @@ const NOTE_MIGRATIONS = {
   tags: "TEXT NOT NULL DEFAULT '[]'", // ["urgente", "ideia"]
   width: 'REAL', // tamanho escolhido pelo usuário (null = padrão)
   height: 'REAL',
+  event_time: 'TEXT', // 'HH:MM' (opcional) — lembrete com horário
+  remind_before: 'INTEGER NOT NULL DEFAULT 0', // aviso antecipado, em minutos
+  repeat_rule: 'TEXT', // 'none' | 'weekly' | 'monthly' | 'yearly'
+  created_by: 'INTEGER', // quem criou (em pasta compartilhada pode não ser o dono)
 };
 const noteColumns = db.prepare('PRAGMA table_info(notes)').all().map((c) => c.name);
 for (const [col, type] of Object.entries(NOTE_MIGRATIONS)) {
   if (!noteColumns.includes(col)) db.exec(`ALTER TABLE notes ADD COLUMN ${col} ${type}`);
 }
+// Post-its antigos: "repetir todo ano" (repeat_yearly) vira repeat_rule = 'yearly'
+db.exec(`UPDATE notes SET repeat_rule = CASE WHEN repeat_yearly = 1 THEN 'yearly' ELSE 'none' END WHERE repeat_rule IS NULL`);
+
+const FOLDER_MIGRATIONS = {
+  parent_id: 'INTEGER REFERENCES folders(id) ON DELETE SET NULL', // subpasta de...
+  position: 'INTEGER NOT NULL DEFAULT 0', // ordem escolhida pelo usuário
+};
+const folderColumns = db.prepare('PRAGMA table_info(folders)').all().map((c) => c.name);
+for (const [col, type] of Object.entries(FOLDER_MIGRATIONS)) {
+  if (!folderColumns.includes(col)) db.exec(`ALTER TABLE folders ADD COLUMN ${col} ${type}`);
+}
+
+db.exec(`
+  -- Pastas compartilhadas: quem (além do dono) pode ver e editar os post-its da pasta
+  CREATE TABLE IF NOT EXISTS folder_members (
+    folder_id INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (folder_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_members_user ON folder_members(user_id);
+`);
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(user_id, folder_id);

@@ -50,7 +50,7 @@ export function ToastProvider({ children }) {
               exit={{ opacity: 0, x: 80 }}
             >
               <span>
-                {t.type === 'success' ? '✅' : t.type === 'error' ? '⚠️' : t.type === 'trash' ? '🗑️' : '💬'} {t.message}
+                {{ success: '✅', error: '⚠️', trash: '🗑️', move: '📁', archive: '📦' }[t.type] ?? '💬'} {t.message}
               </span>
               {t.action && (
                 <button

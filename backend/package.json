@@ -8,7 +8,9 @@
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "start": "node --env-file-if-exists=.env src/server.js",
     "seed": "node scripts/seed-demo.mjs",
-    "test": "node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "teste:grupo": "node scripts/teste-grupo.mjs",
+    "teste:ao-vivo": "node scripts/colegas-ao-vivo.mjs"
   },
   "engines": {
     "node": ">=22.13"

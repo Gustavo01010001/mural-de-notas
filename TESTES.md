@@ -173,3 +173,8 @@ e-mail no mesmo campo continua valendo; lista de participantes sem e-mail para t
 perfil e **Copiar** põe o ID na área de transferência ("Copiado!" + aviso). Na pasta "Trabalho em grupo",
 ID errado → "Não achei ninguém com esse ID…"; ID do João digitado `bzkbty9w` → "Pasta compartilhada com
 João Colega!", a lista mostra nome + ID e nenhum e-mail; o João passa a ver a pasta em "Compartilhadas comigo".
+
+# ✅ Rodada 6 — Teste em grupo (30/10/2026)
+
+5 estudantes ao mesmo tempo numa pasta compartilhada (script + 3 contas logadas no navegador): **20 OK · 0 falhas · 5 achados**.
+Detalhes, achados e como repetir em [TESTE_GRUPO.md](TESTE_GRUPO.md).

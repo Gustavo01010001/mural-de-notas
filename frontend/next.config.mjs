@@ -13,7 +13,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:4000';
 const nextConfig = {
   reactStrictMode: true,
   turbopack: { root: import.meta.dirname },
-  allowedDevOrigins: lanIPs,
+  allowedDevOrigins: ['127.0.0.1', ...lanIPs], // 127.0.0.1: abrir outra conta numa aba à parte (testes)
   // Sem o botãozinho "N" do Next no canto: só aparecia em desenvolvimento e cobria "Próximas datas"
   devIndicators: false,
   // O navegador fala só com o front (http ou https, mesmo endereço);

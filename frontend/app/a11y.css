@@ -1100,3 +1100,41 @@ html.theme-light .my-code {
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   letter-spacing: 0.04em;
 }
+
+/* =====================================================================
+   Quem está na pasta (teste em grupo): bolinhas nunca somem espremidas
+   ===================================================================== */
+.presence-bar {
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.presence-bar .avatar.mini {
+  flex-shrink: 0;
+}
+
+.presence-count {
+  display: none;
+  margin-left: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* topo apertado: mostra "4 online" no lugar das bolinhas */
+@media (max-width: 1100px) {
+  .presence-bar .avatar.mini {
+    display: none !important;
+  }
+
+  .presence-count {
+    display: inline;
+  }
+}
+
+@media (max-width: 480px) {
+  .presence-count {
+    margin-left: 4px;
+    font-size: 0.75rem;
+  }
+}

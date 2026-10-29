@@ -62,6 +62,8 @@ export function PresenceBar({ presence, meId, connected, onOpen }) {
         ))}
       </AnimatePresence>
       {others.length > 3 && <span className="avatar mini more">+{others.length - 3}</span>}
+      {/* tela estreita: em vez de bolinhas espremidas, o número de pessoas */}
+      {others.length > 0 && <span className="presence-count">{others.length} online</span>}
       {others.length === 0 && <span className="presence-label">👥</span>}
     </motion.button>
   );

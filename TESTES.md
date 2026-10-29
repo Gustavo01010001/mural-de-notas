@@ -162,3 +162,14 @@ consistência, feedback, affordance) das aulas de IHC. Problemas encontrados e o
 **Verificado no navegador:** PC (1366×768) e celular (375×812, toque): nenhum elemento fixo
 se sobrepõe a outro (conferido por script com as caixas de cada elemento), sem rolagem lateral,
 menu "Mais" com 3 opções escritas, menu do post-it com Editar/Fixar no celular. `next build` ok.
+
+# ✅ Rodada 5 — Convidar pelo ID (30/10/2026)
+
+**Automáticos:** `npm test` → **64/64** (novos: o ID nasce no cadastro e aparece em `/auth/me`; convite pelo ID
+colado em minúsculas, sem hífen ou com espaços; ID inválido → 400, inexistente → 404, o próprio → 400;
+e-mail no mesmo campo continua valendo; lista de participantes sem e-mail para todos).
+
+**Navegador:** a conta antiga (Maria) ganhou ID ao reiniciar o servidor (`F87Q-2VP7`); "Seu ID" aparece no
+perfil e **Copiar** põe o ID na área de transferência ("Copiado!" + aviso). Na pasta "Trabalho em grupo",
+ID errado → "Não achei ninguém com esse ID…"; ID do João digitado `bzkbty9w` → "Pasta compartilhada com
+João Colega!", a lista mostra nome + ID e nenhum e-mail; o João passa a ver a pasta em "Compartilhadas comigo".

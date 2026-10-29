@@ -131,9 +131,14 @@ Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede qu
   (arraste a alça ⠿ no seletor de pastas). O topo mostra o caminho: "Faculdade › Cálculo".
 - **Arrastar o post-it até uma pasta:** ao começar a arrastar aparece uma faixa com as pastas no alto
   da tela; solte em cima de uma para mover (com Desfazer). No celular: menu ⋯ → "Mover para pasta…".
-- **Compartilhar (👥):** convide alguém pelo e-mail (a pessoa precisa ter conta). Quem foi convidado vê
-  e edita os post-its daquela pasta, que aparece em "Compartilhadas comigo". Só quem criou renomeia,
-  apaga ou convida; o convidado pode sair quando quiser.
+- **Compartilhar (👥):** convide alguém pelo **ID** ou pelo e-mail (a pessoa precisa ter conta). Quem foi
+  convidado vê e edita os post-its daquela pasta, que aparece em "Compartilhadas comigo". Só quem criou
+  renomeia, apaga ou convida; o convidado pode sair quando quiser.
+- **ID para convite:** cada conta ganha um ID próprio (ex.: `K7P2-9QXM`) que aparece em
+  **Configurações → Perfil**, embaixo do nome, com botão **Copiar** (e **Enviar** no celular). A pessoa manda
+  o ID para o colega, que cola no campo "Convidar alguém". Aceita colado em minúsculas, sem hífen ou com
+  espaços. O ID não revela o e-mail: a lista de participantes mostra **nome + ID**, nunca o e-mail.
+  O ID é aleatório e sem letras que se confundem (0/O, 1/I/L); até 30 convites a cada 10 min por pessoa.
 - **Ao vivo, como no Miro:** com a pasta aberta, cada pessoa vê o **cursor das outras com o nome**,
   as bolinhas de quem está na pasta agora e os post-its mudando na hora (sem recarregar).
   Funciona com Server-Sent Events (uma conexão aberta do servidor para o navegador), sem bibliotecas extras.
@@ -271,7 +276,7 @@ A chave fica **só no backend**, nunca vai para o navegador.
 | POST   | `/notes/batch`           | Mover/fixar/arquivar/excluir vários        |
 | POST   | `/notes/arrange`         | Arrumar a pasta em grade                   |
 | PUT    | `/folders/order`         | Nova ordem das pastas de um nível          |
-| GET/POST | `/folders/:id/members` | Quem participa / convidar por e-mail       |
+| GET/POST | `/folders/:id/members` | Quem participa / convidar (`{ who }`: ID ou e-mail) |
 | DELETE | `/folders/:id/members/:userId` | Tirar alguém ou sair da pasta        |
 | GET    | `/live/folders/:id`      | "Ao vivo" (SSE): presença, cursores, mudanças |
 | POST   | `/live/folders/:id/cursor` | Posição do meu cursor                    |

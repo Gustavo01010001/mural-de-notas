@@ -110,13 +110,15 @@ em BLOB), `folders` (dono, nome, ícone, cor, pai, posição), `folder_members`,
 | Excluir conta = `deleted_at` + 30 dias | arrependimento/engano; login dentro do prazo restaura |
 | Backup com `VACUUM INTO` (1/dia, guarda 7) | cópia consistente com o banco aberto, sem parar o servidor |
 | Aparência também em `localStorage` (`mural_look`) | evita "piscar" o tema escuro antes de carregar |
+| ID público `users.public_code` (XXXX-XXXX, aleatório) | convidar sem e-mail; não expõe o id interno nem quantas contas existem |
+| Lista de participantes sem e-mail (só nome + ID) | quem convidou pelo ID não deve descobrir o e-mail do outro |
 
 ## 6. Como rodar e testar
 
 ```bash
 cd backend && npm install && npm run dev      # API em 127.0.0.1:4000
 cd frontend && npm install && npm run dev     # HTTPS em https://localhost:3000 e https://SEU_IP:3000
-cd backend && npm test                        # 60 testes (banco temporário)
+cd backend && npm test                        # 64 testes (banco temporário)
 cd backend && npm run seed -- <email> <senha> # dados de exemplo (6 pastas, 40 post-its)
 ```
 
@@ -135,7 +137,7 @@ Certificado no Windows (já feito pelo dono): `certutil -user -addstore Root "fr
 
 ## 8. Erros / pendências conhecidas
 
-Nenhum erro bloqueante aberto: 60/60 testes, build ok, sem erros de código no console.
+Nenhum erro bloqueante aberto: 64/64 testes, build ok, sem erros de código no console.
 Limitações e pontos de atenção:
 
 - **Aviso de certificado em celulares de outras pessoas**: só some instalando a CA ou publicando com domínio real.

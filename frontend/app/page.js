@@ -29,6 +29,9 @@ import FocusTimer from '@/components/FocusTimer';
 import Icon from '@/components/Icon';
 import { resolveScene } from '@/lib/scenes';
 
+// O mural livre começa abaixo da barra do topo (senão os post-its de cima ficam escondidos atrás dela)
+const BOARD_TOP = 76;
+
 const ALERT_POLL_MS = 60 * 1000;
 
 // Usado até o back responder (o back tem os mesmos padrões)
@@ -486,7 +489,7 @@ export default function BoardPage() {
     const onMove = (e) => {
       if (e.pointerType === 'touch') return;
       const x = (e.clientX + el.scrollLeft) / zoom;
-      const y = (e.clientY + el.scrollTop) / zoom;
+      const y = (e.clientY + el.scrollTop - BOARD_TOP) / zoom;
       sendCursor(Math.round(x), Math.round(y));
     };
     el.addEventListener('pointermove', onMove);
@@ -502,7 +505,14 @@ export default function BoardPage() {
     return null;
   }
 
-  async function handleSave(form, image = 'keep') {
+  // Quem mudou por último um post-it (para o aviso "Fulano acabou de mudar este post-it")
+  const changedByName = (n) => {
+    if (!n?.updatedBy) return null;
+    if (n.updatedBy === user?.id) return 'Você (em outra aba)';
+    return live.presence.find((p) => p.id === n.updatedBy)?.name ?? null;
+  };
+
+  async function handleSave(form, image = 'keep', { force = false } = {}) {
     // Pede permissão de notificação na primeira vez que o usuário marca uma data
     if (form.eventDate && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -510,7 +520,8 @@ export default function BoardPage() {
     const targetFolder = form.folderId ?? null;
     try {
       if (modal.note) {
-        const data = await api(`/notes/${modal.note.id}`, { method: 'PUT', body: form });
+        // baseVersion: a versão que estava aberta; se alguém mudou no meio tempo, o back avisa (409)
+        const data = await api(`/notes/${modal.note.id}`, { method: 'PUT', body: { ...form, baseVersion: modal.note.version, force } });
         const withImage = (await saveImage(modal.note.id, image)) ?? data.note;
         if (targetFolder !== (modal.note.folderId ?? null)) {
           // Mudou de pasta: sai deste mural
@@ -531,7 +542,7 @@ export default function BoardPage() {
         const body = {
           ...form,
           x: (board?.scrollLeft ?? 0) / z + 16 + Math.random() * Math.max(10, window.innerWidth / z - noteW - 32),
-          y: (board?.scrollTop ?? 0) / z + (mobile ? 150 : 110) + Math.random() * Math.max(40, window.innerHeight / z - 450),
+          y: (board?.scrollTop ?? 0) / z + (mobile ? 80 : 40) + Math.random() * Math.max(40, window.innerHeight / z - 450),
         };
         const data = await api('/notes', { method: 'POST', body });
         let created = data.note;
@@ -554,6 +565,8 @@ export default function BoardPage() {
     } catch (err) {
       // erro de preenchimento (o back recusou): o formulário mostra ao lado do campo, não num balão longe
       if (err.status === 400) return { error: err.message };
+      // conflito: alguém mudou o post-it enquanto esta pessoa editava
+      if (err.status === 409 && err.data?.conflict) return { conflict: { ...err.data.conflict, message: err.message } };
       handleAuthError(err);
       return false;
     }
@@ -885,7 +898,7 @@ export default function BoardPage() {
   const canvasH = Math.max(0, ...notes.map((n) => n.y + (n.height ?? 300) + 90));
   // O mural "de fora" tem o tamanho já com zoom (para a rolagem funcionar);
   // por dentro os post-its continuam nas coordenadas reais e o conjunto é escalado
-  const canvasStyle = gridMode ? undefined : { width: `max(100%, ${canvasW * z}px)`, height: `max(100%, ${canvasH * z}px)` };
+  const canvasStyle = gridMode ? undefined : { width: `max(100%, ${canvasW * z}px)`, height: `max(100%, ${canvasH * z + BOARD_TOP}px)` };
   const zoomStyle = gridMode
     ? undefined
     : {
@@ -1200,6 +1213,9 @@ export default function BoardPage() {
       <NoteModal
         open={modal.open}
         note={modal.note}
+        latest={modal.note ? notes.find((n) => n.id === modal.note.id) ?? null : null}
+        whoChanged={changedByName(modal.note ? notes.find((n) => n.id === modal.note.id) : null)}
+        onRebase={(fresh) => setModal((m) => ({ ...m, note: fresh }))}
         defaultColor={settings.defaultColor}
         folders={isSharedWithMe ? [{ ...currentInfo, depth: 1 }] : flattenTree(folders)}
         sharedLocked={isSharedWithMe}

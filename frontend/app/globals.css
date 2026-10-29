@@ -2287,7 +2287,7 @@ button.upcoming-item:hover {
 /* ============ Zoom do mural ============ */
 .canvas-zoom {
   position: absolute;
-  top: 0;
+  top: 76px; /* = BOARD_TOP em page.js: começa abaixo da barra do topo */
   left: 0;
   transform-origin: 0 0;
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);

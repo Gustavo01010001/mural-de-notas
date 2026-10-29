@@ -128,7 +128,7 @@ record('Login simultâneo do grupo', 'OK', `${GROUP.length} contas entraram ao m
 // ---------- A: pasta do grupo + convites pelo ID ao mesmo tempo ----------
 const stamp = new Date().toLocaleString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const folder = (
-  await call('/folders', { method: 'POST', token: maria.token, body: { name: `TCC Grupo 3 — App de Caronas`, icon: '🎓', color: 'purple' } })
+  await call('/folders', { method: 'POST', token: maria.token, body: { name: `TCC Grupo 3 · ${stamp}`, icon: '🎓', color: 'purple' } })
 ).data.folder;
 const invites = await Promise.all(members.map((m) => call(`/folders/${folder.id}/members`, { method: 'POST', token: maria.token, body: { who: m.code } })));
 const okInv = invites.filter((r) => r.status === 201).length;
@@ -233,13 +233,20 @@ const versions = [
   [ana, 'Questionário: 128 respostas · 71% usariam o app · + 12 entrevistas qualitativas'],
   [bruno, 'Questionário: 130 respostas (2 novas) · 71% usariam o app'],
 ];
-await Promise.all(versions.map(([u, content]) => call(`/notes/${dados.id}`, { method: 'PUT', token: u.token, body: noteBody(dados, { content }) })));
+// como o app faz: cada um manda a versão que abriu (baseVersion)
+const saves = await Promise.all(
+  versions.map(([u, content]) => call(`/notes/${dados.id}`, { method: 'PUT', token: u.token, body: { ...noteBody(dados, { content }), baseVersion: dados.version } })),
+);
 const finalDados = (await call(`/notes?folder=${folder.id}`, { token: maria.token })).data.notes.find((n) => n.id === dados.id);
 const winner = versions.find(([, c]) => c === finalDados.content)?.[0]?.name ?? '???';
+const saved = saves.filter((r) => r.status === 200).length;
+const warned = saves.filter((r) => r.status === 409 && r.data?.conflict);
 record(
   'Edição simultânea do mesmo post-it (3 pessoas)',
-  'ACHADO',
-  `sem erro e sem dado corrompido, mas ficou só a versão de ${winner}; as outras 2 foram descartadas sem nenhum aviso (o último a salvar vence)`,
+  saved === 1 && warned.length === 2 ? 'OK' : 'ACHADO',
+  saved === 1 && warned.length === 2
+    ? `ficou a versão de ${winner}; os outros 2 receberam o aviso "${warned[0].data.error}" e podem escolher o que fazer (nada some sem aviso)`
+    : `${saved} salvaram e ${warned.length} foram avisados — o último a salvar ainda pode apagar o outro`,
 );
 
 // ---------- F: a "cópia velha" (janela de edição aberta) apaga o trabalho dos outros ----------
@@ -249,9 +256,9 @@ const joaoCopy = (await call(`/notes?folder=${folder.id}`, { token: joao.token }
 await call(`/notes/${board.id}/checklist/${joaoCopy.checklist[8].id}`, { method: 'PATCH', token: ana.token, body: { done: false } });
 await call(`/notes/${board.id}/checklist/${joaoCopy.checklist[9].id}`, { method: 'PATCH', token: ana.token, body: { done: false } });
 const beforeJoao = (await call(`/notes?folder=${folder.id}`, { token: bruno.token })).data.notes.find((n) => n.id === board.id);
-await call(`/notes/${board.id}`, { method: 'PUT', token: bruno.token, body: noteBody(beforeJoao, { content: 'Bruno: API e banco atrasados 1 semana!' }) });
+await call(`/notes/${board.id}`, { method: 'PUT', token: bruno.token, body: { ...noteBody(beforeJoao, { content: 'Bruno: API e banco atrasados 1 semana!' }), baseVersion: beforeJoao.version } });
 // ...e o João salva a cópia dele (só trocou o título)
-await call(`/notes/${board.id}`, { method: 'PUT', token: joao.token, body: noteBody(joaoCopy, { title: 'Divisão de tarefas (atualizada)' }) });
+const joaoSave = await call(`/notes/${board.id}`, { method: 'PUT', token: joao.token, body: { ...noteBody(joaoCopy, { title: 'Divisão de tarefas (atualizada)' }), baseVersion: joaoCopy.version } });
 const afterStale = (await call(`/notes?folder=${folder.id}`, { token: maria.token })).data.notes.find((n) => n.id === board.id);
 const lostBruno = !afterStale.content.includes('atrasados');
 const lostAna = afterStale.checklist[8].done && afterStale.checklist[9].done;
@@ -260,7 +267,7 @@ record(
   lostBruno || lostAna ? 'ACHADO' : 'OK',
   lostBruno || lostAna
     ? `o João salvou uma cópia antiga e apagou sem aviso ${[lostBruno && 'a observação do Bruno', lostAna && 'as 2 tarefas que a Ana desmarcou'].filter(Boolean).join(' e ')}`
-    : 'nenhuma mudança dos outros se perdeu',
+    : `nenhuma mudança dos outros se perdeu — o João recebeu "${joaoSave.data?.error ?? joaoSave.status}"`,
 );
 
 // ---------- G: todo mundo arrasta o mesmo post-it ----------
@@ -357,7 +364,8 @@ await wait(500);
 const carolAfter = {
   ver: (await call(`/notes?folder=${folder.id}`, { token: carol.token })).status,
   editar: (await call(`/notes/${tema.id}`, { method: 'PUT', token: carol.token, body: noteBody(temaAfter, { content: 'hackeado' }) })).status,
-  buscar: ((await call('/notes/search?q=entrevistas', { token: carol.token })).data.results ?? []).length,
+  // só conta resultados DESTA pasta (ela pode participar de outras pastas de rodadas anteriores)
+  buscar: ((await call('/notes/search?q=entrevistas', { token: carol.token })).data.results ?? []).filter((r) => r.folderId === folder.id).length,
 };
 const carolOut = carolAfter.ver >= 400 && carolAfter.editar >= 400 && carolAfter.buscar === 0;
 record(

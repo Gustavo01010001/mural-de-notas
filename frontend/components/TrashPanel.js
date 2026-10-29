@@ -110,7 +110,13 @@ export default function TrashPanel({ mode, onClose, folders, onChanged, toast, o
                       <strong>{n.title}</strong>
                       {n.content && <small>{n.content.slice(0, 90)}</small>}
                       <span className="trash-meta">
-                        {folderLabel(n.folderId)}
+                        {n.sharedTrash ? (
+                          <>
+                            <Icon name="users" size={13} /> {n.folderName} · pasta de {n.ownerName}
+                          </>
+                        ) : (
+                          folderLabel(n.folderId)
+                        )}
                         {mode === 'trash' && ` · apaga sozinho em ${daysLeftInTrash(n.deletedAt)} dias`}
                       </span>
                     </div>
@@ -120,9 +126,16 @@ export default function TrashPanel({ mode, onClose, folders, onChanged, toast, o
                           <button type="button" className="btn-dark small" onClick={() => run(`/notes/${n.id}/restore`, 'POST', undefined, n.id)}>
                             ↩ Restaurar
                           </button>
-                          <button type="button" className="btn-ghost small" onClick={() => run(`/notes/${n.id}/permanent`, 'DELETE', undefined, n.id)}>
-                            Apagar de vez
-                          </button>
+                          {/* do grupo: quem excluiu pode desfazer, mas só a dona apaga de vez */}
+                          {n.sharedTrash ? (
+                            <small className="trash-owner-only" title="Só quem criou a pasta pode apagar de vez">
+                              só {n.ownerName.split(' ')[0]} apaga de vez
+                            </small>
+                          ) : (
+                            <button type="button" className="btn-ghost small" onClick={() => run(`/notes/${n.id}/permanent`, 'DELETE', undefined, n.id)}>
+                              Apagar de vez
+                            </button>
+                          )}
                         </>
                       ) : (
                         <>

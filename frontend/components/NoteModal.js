@@ -41,7 +41,21 @@ function fromNote(note, defaultColor, currentFolder) {
   };
 }
 
-export default function NoteModal({ open, note, defaultColor, folders = [], currentFolder = null, sharedLocked = false, onClose, onSave }) {
+// latest: a versão mais nova desse post-it que chegou pelo "ao vivo" (para avisar se alguém mudou enquanto edito)
+// onRebase: carregar outra versão do post-it no formulário (a nova, descartando o que eu tinha mudado)
+export default function NoteModal({
+  open,
+  note,
+  latest = null,
+  whoChanged = null,
+  defaultColor,
+  folders = [],
+  currentFolder = null,
+  sharedLocked = false,
+  onClose,
+  onSave,
+  onRebase,
+}) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [newItem, setNewItem] = useState('');
@@ -54,12 +68,14 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
   const titleRef = useRef(null);
   const [error, setError] = useState('');
   const [extras, setExtras] = useState({});
+  const [conflict, setConflict] = useState(null); // o back recusou: alguém salvou antes
 
   useEffect(() => {
     if (!open) return;
     const f = fromNote(note, defaultColor, currentFolder);
     setForm(f);
     setError('');
+    setConflict(null);
     setExtras({ checklist: f.checklist.length > 0, tags: f.tags.length > 0, photo: Boolean(note?.hasImage), date: f.hasDate });
     setNewItem('');
     setTagInput('');
@@ -111,9 +127,10 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
   const set = (field) => (e) =>
     setForm((f) => ({ ...f, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(e, { force = false } = {}) {
+    e?.preventDefault();
     setSaving(true);
+    setConflict(null);
     // Só repassa o que foi digitado; quem valida e salva é o back
     // etiqueta digitada e não confirmada com Enter também entra
     const pendingTags = parseTagInput(tagInput);
@@ -134,15 +151,20 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
         repeat: form.hasDate ? (form.eventType === 'birthday' ? 'yearly' : form.repeat) : 'none',
       },
       image,
+      { force },
     );
     setSaving(false);
     if (result === true) return onClose();
+    if (result?.conflict) return setConflict(result.conflict);
     if (result?.error) {
       setError(result.error);
       // erro no título: volta o cursor para lá
       if (/título/i.test(result.error)) titleRef.current?.focus();
     }
   }
+
+  // Chegou pelo "ao vivo" uma versão mais nova deste post-it enquanto a janela está aberta
+  const staleLive = Boolean(note && latest && latest.version > note.version && !conflict);
 
   const titleError = /título/i.test(error) ? error : '';
   const otherError = titleError ? '' : error;
@@ -175,6 +197,20 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
           >
             <span className="postit-tape" />
             <h2>{note ? 'Editar post-it' : 'Novo post-it'}</h2>
+
+            <AnimatePresence>
+              {staleLive && (
+                <motion.div className="stale-banner" role="status" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <Icon name="users" size={16} />
+                  <span>
+                    <b>{whoChanged ?? 'Alguém do grupo'}</b> acabou de mudar este post-it.
+                  </span>
+                  <button type="button" className="btn-small" onClick={() => onRebase?.(latest)}>
+                    Carregar a versão nova
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <label className="sr-only" htmlFor="note-title">
               Título
@@ -500,6 +536,36 @@ export default function NoteModal({ open, note, defaultColor, folders = [], curr
                 <Icon name="alert" size={14} /> {otherError}
               </small>
             )}
+
+            <AnimatePresence>
+              {conflict && (
+                <motion.div className="conflict-box" role="alertdialog" aria-label="Conflito de edição" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <p className="conflict-title">
+                    <Icon name="alert" size={16} /> {conflict.message}
+                  </p>
+                  <p>Para não apagar o trabalho de ninguém, escolha:</p>
+                  <div className="conflict-preview">
+                    <small>Versão {conflict.mine ? 'salva na outra aba' : `de ${conflict.by}`}:</small>
+                    <b>{conflict.note.title}</b>
+                    {conflict.note.content && <span>{conflict.note.content.slice(0, 160)}</span>}
+                    {conflict.note.checklist?.length > 0 && (
+                      <span>
+                        Checklist: {conflict.note.checklist.filter((i) => i.done).length}/{conflict.note.checklist.length} feitos
+                      </span>
+                    )}
+                  </div>
+                  <div className="conflict-actions">
+                    <button type="button" className="btn-small" onClick={() => onRebase?.(conflict.note)}>
+                      Usar a versão {conflict.mine ? 'salva' : `de ${conflict.by.split(' ')[0]}`}
+                    </button>
+                    <button type="button" className="btn-small ghost" onClick={() => handleSubmit(null, { force: true })}>
+                      Salvar a minha mesmo assim
+                    </button>
+                  </div>
+                  <small className="conflict-hint">Dica: “Usar a versão {conflict.mine ? 'salva' : 'dele(a)'}” descarta o que você mudou aqui; copie antes o que quiser manter.</small>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="modal-buttons">
               <button type="button" className="btn-ghost" onClick={onClose}>

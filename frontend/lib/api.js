@@ -11,9 +11,11 @@ const HINT_KEY = 'mural_logged';
 const LEGACY_TOKEN_KEY = 'mural_token'; // versões antigas guardavam o token aqui
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  // data: o corpo da resposta (ex.: a versão atual do post-it num conflito de edição)
+  constructor(message, status, data = null) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -99,7 +101,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) clearSession();
-    throw new ApiError(data.error || 'Algo deu errado.', res.status);
+    throw new ApiError(data.error || 'Algo deu errado.', res.status, data);
   }
   return data;
 }

@@ -314,8 +314,13 @@ describe('Pastas', () => {
     assert.equal((await call('/folders', { method: 'POST', token, body: { name: 'trabalho NOVO' } })).status, 409);
     assert.equal((await call('/folders', { method: 'POST', token, body: { name: '   ' } })).status, 400);
     assert.equal((await call('/folders', { method: 'POST', token, body: { name: 'x'.repeat(41) } })).status, 400);
+    // ícone que não é emoji: avisa (antes virava 📁 sem dizer nada)
     const weird = await call('/folders', { method: 'POST', token, body: { name: 'Ícone estranho', icon: '<b>' } });
-    assert.equal(weird.data.folder.icon, '📁');
+    assert.equal(weird.status, 400);
+    assert.match(weird.data.error, /emoji/);
+    // qualquer emoji vale, inclusive fora da lista da tela
+    assert.equal((await call('/folders', { method: 'POST', token, body: { name: 'Formatura', icon: '🎓' } })).data.folder.icon, '🎓');
+    assert.equal((await call('/folders', { method: 'POST', token, body: { name: 'Sem ícone' } })).data.folder.icon, '📁');
   });
 
   test('post-its ficam na pasta certa, contadores batem, mover e apagar pasta', async () => {
@@ -1128,5 +1133,118 @@ describe('Convidar pelo ID da pessoa', () => {
         assert.ok(!('email' in p));
       }
     }
+  });
+});
+
+describe('Trabalho em grupo: edição ao mesmo tempo, lembretes, lixeira e backup', () => {
+  let dona, colega, outro, folder, note;
+  const ymdIn = (days) => addDays(today(), days);
+
+  before(async () => {
+    dona = await newUser('Helena');
+    colega = await newUser('Igor');
+    outro = await newUser('Júlia');
+    folder = (await call('/folders', { method: 'POST', token: dona.token, body: { name: 'Seminário', icon: '🎓' } })).data.folder;
+    await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: colega.user.code } });
+    note = (
+      await call('/notes', {
+        method: 'POST',
+        token: dona.token,
+        body: { title: 'Roteiro', content: 'Parte 1: Helena', folderId: folder.id, checklist: [{ text: 'Slides' }, { text: 'Ensaiar' }] },
+      })
+    ).data.note;
+  });
+
+  test('cada mudança de conteúdo sobe a versão do post-it e guarda quem mudou', async () => {
+    assert.equal(note.version, 1);
+    const r = await call(`/notes/${note.id}`, { method: 'PUT', token: colega.token, body: { ...note, content: 'Parte 1: Helena · Parte 2: Igor', baseVersion: 1 } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.equal(r.data.note.version, 2);
+    assert.equal(r.data.note.updatedBy, colega.user.id);
+    const t = await call(`/notes/${note.id}/checklist/${note.checklist[0].id}`, { method: 'PATCH', token: dona.token, body: { done: true } });
+    assert.equal(t.data.note.version, 3, 'marcar item da checklist também conta como mudança');
+    // arrastar não muda a versão (não conflita com quem está editando o texto)
+    const m = await call(`/notes/${note.id}/position`, { method: 'PATCH', token: colega.token, body: { x: 10, y: 10 } });
+    assert.equal(m.data.note.version, 3);
+  });
+
+  test('salvar uma cópia velha é recusado (409) com a versão atual e quem mudou', async () => {
+    // o Igor abriu na versão 2 e a Helena marcou a checklist (versão 3): ele salva a cópia dele
+    const stale = await call(`/notes/${note.id}`, { method: 'PUT', token: colega.token, body: { ...note, title: 'Roteiro final', baseVersion: 2 } });
+    assert.equal(stale.status, 409);
+    assert.match(stale.data.error, /Helena mudou este post-it/);
+    assert.equal(stale.data.conflict.by, 'Helena');
+    assert.equal(stale.data.conflict.note.version, 3);
+    assert.equal(stale.data.conflict.note.checklist[0].done, true);
+    // nada foi apagado
+    const now = (await call(`/notes?folder=${folder.id}`, { token: dona.token })).data.notes.find((n) => n.id === note.id);
+    assert.equal(now.title, 'Roteiro');
+    assert.equal(now.checklist[0].done, true);
+  });
+
+  test('"salvar a minha mesmo assim" (force) e quem não manda versão continuam funcionando', async () => {
+    const forced = await call(`/notes/${note.id}`, { method: 'PUT', token: colega.token, body: { ...note, title: 'Roteiro do Igor', baseVersion: 2, force: true } });
+    assert.equal(forced.status, 200);
+    assert.equal(forced.data.note.title, 'Roteiro do Igor');
+    const legacy = await call(`/notes/${note.id}`, { method: 'PUT', token: dona.token, body: { ...note, title: 'Roteiro' } });
+    assert.equal(legacy.status, 200, 'sem baseVersion = como antes (sem checagem)');
+  });
+
+  test('conflito consigo mesmo (outra aba) tem mensagem própria', async () => {
+    const cur = (await call(`/notes?folder=${folder.id}`, { token: dona.token })).data.notes.find((n) => n.id === note.id);
+    await call(`/notes/${note.id}`, { method: 'PUT', token: dona.token, body: { ...cur, content: 'aba 1', baseVersion: cur.version } });
+    const r = await call(`/notes/${note.id}`, { method: 'PUT', token: dona.token, body: { ...cur, content: 'aba 2', baseVersion: cur.version } });
+    assert.equal(r.status, 409);
+    assert.equal(r.data.conflict.mine, true);
+    assert.match(r.data.error, /outra aba/);
+  });
+
+  test('lembretes da pasta do grupo chegam para quem participa, e cada um fecha o seu', async () => {
+    const reuniao = (
+      await call('/notes', { method: 'POST', token: colega.token, body: { title: 'Reunião do grupo', folderId: folder.id, eventDate: ymdIn(0), eventType: 'event' } })
+    ).data.note;
+    const alertsIgor = (await call('/alerts', { token: colega.token })).data.alerts;
+    const a = alertsIgor.find((x) => x.id === reuniao.id);
+    assert.ok(a, 'o convidado recebe o aviso');
+    assert.ok(!(await call('/alerts', { token: outro.token })).data.alerts.some((x) => x.id === reuniao.id), 'quem não é do grupo não recebe');
+    // Igor fecha: some só para ele
+    assert.equal((await call(`/alerts/${reuniao.id}/dismiss`, { method: 'POST', token: colega.token, body: { key: a.alertKey } })).status, 200);
+    assert.ok(!(await call('/alerts', { token: colega.token })).data.alerts.some((x) => x.id === reuniao.id));
+    assert.ok((await call('/alerts', { token: dona.token })).data.alerts.some((x) => x.id === reuniao.id), 'continua para a dona');
+    // quem não tem acesso não fecha
+    assert.equal((await call(`/alerts/${reuniao.id}/dismiss`, { method: 'POST', token: outro.token, body: { key: a.alertKey } })).status, 404);
+  });
+
+  test('o que o convidado exclui aparece na lixeira DELE; ele restaura, mas só a dona apaga de vez', async () => {
+    const extra = (await call('/notes', { method: 'POST', token: colega.token, body: { title: 'Rascunho do Igor', folderId: folder.id } })).data.note;
+    await call(`/notes/${extra.id}`, { method: 'DELETE', token: colega.token });
+    const trash = (await call('/notes/trash', { token: colega.token })).data.notes;
+    const mine = trash.find((n) => n.id === extra.id);
+    assert.ok(mine, 'aparece na lixeira de quem excluiu');
+    assert.equal(mine.sharedTrash, true);
+    assert.equal(mine.ownerName, 'Helena');
+    assert.equal(mine.folderName, 'Seminário');
+    assert.ok((await call('/notes/trash', { token: dona.token })).data.notes.some((n) => n.id === extra.id), 'e na da dona também');
+    assert.equal((await call('/folders', { token: colega.token })).data.trashCount, 1);
+    assert.equal((await call(`/notes/${extra.id}/permanent`, { method: 'DELETE', token: colega.token })).status, 404);
+    assert.equal((await call(`/notes/${extra.id}/restore`, { method: 'POST', token: colega.token })).status, 200);
+    assert.ok(!(await call('/notes/trash', { token: colega.token })).data.notes.some((n) => n.id === extra.id));
+  });
+
+  test('backup do convidado traz a pasta do grupo, e importar cria uma cópia', async () => {
+    const backup = (await call('/account/export', { token: colega.token })).data;
+    const groupFolder = backup.folders.find((f) => f.shared);
+    assert.ok(groupFolder, 'a pasta do grupo está no backup');
+    assert.equal(groupFolder.name, 'Seminário');
+    assert.equal(groupFolder.ownerName, 'Helena');
+    const groupNotes = backup.notes.filter((n) => n.folderId === groupFolder.id);
+    assert.ok(groupNotes.some((n) => n.title.startsWith('Roteiro')));
+    assert.ok(groupNotes.every((n) => n.fromGroup));
+    // levar o backup para outra conta: vira uma pasta própria "(cópia do grupo)"
+    const imp = await call('/account/import', { method: 'POST', token: outro.token, body: { backup } });
+    assert.equal(imp.status, 200, JSON.stringify(imp.data));
+    const copy = (await call('/folders', { token: outro.token })).data.folders.find((f) => f.name.includes('(cópia do grupo)'));
+    assert.ok(copy);
+    assert.ok((await call(`/notes?folder=${copy.id}`, { token: outro.token })).data.notes.some((n) => n.title.startsWith('Roteiro')));
   });
 });

@@ -6,7 +6,7 @@ import { COLORS } from '@/lib/format';
 import { childrenOf, MAX_DEPTH, pathOf, validParents } from '@/lib/folderTree';
 import Icon from './Icon';
 
-export const FOLDER_ICONS = ['📁', '💼', '📚', '💡', '✈️', '🍳', '🏠', '❤️', '🎯', '🎮', '🎵', '🛒', '💰', '🏋️', '🧠', '⭐'];
+export const FOLDER_ICONS = ['📁', '💼', '📚', '🎓', '📝', '💡', '✈️', '🍳', '🏠', '❤️', '🎯', '🎮', '🎵', '🛒', '💰', '🏋️', '🧠', '⭐'];
 
 // Formulário para criar ou editar uma pasta: nome, ícone, cor e "dentro de qual pasta"
 function FolderEditor({ initial, folders, fixedParentId, submitLabel, onSubmit, onCancel }) {

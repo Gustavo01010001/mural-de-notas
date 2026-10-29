@@ -1,4 +1,5 @@
 import { NoteModel } from '../models/noteModel.js';
+import { FolderModel } from '../models/folderModel.js';
 import { nextOccurrence, nowIn, timeToMinutes, todayIn } from '../utils/dates.js';
 import { minutesUntil, reminderStage } from '../utils/reminders.js';
 
@@ -16,10 +17,17 @@ export function withCountdown(note, today) {
 
 /**
  * Alertas de agora (que o usuário ainda não fechou) e próximas datas (até 7 dias).
+ * Inclui as datas das pastas compartilhadas comigo: em grupo, todo mundo precisa do lembrete.
  */
 export function getAlerts(userId, tz) {
   const now = nowIn(tz);
-  const notes = NoteModel.listWithDates(userId).map((n) => withCountdown(n, now.date));
+  const shared = FolderModel.sharedFolderIds(userId);
+  const visible = NoteModel.listDatedVisible(userId, shared);
+  // nos post-its do grupo, cada convidado fecha o próprio aviso (não fecha para todo mundo)
+  const memberKeys = NoteModel.memberDismissed(userId, visible.filter((n) => n.ownerId !== userId).map((n) => n.id));
+  const notes = visible.map((n) =>
+    withCountdown(n.ownerId === userId ? n : { ...n, dismissed: memberKeys.get(n.id) ?? [], fromShared: true }, now.date),
+  );
 
   const alerts = [];
   const upcoming = [];

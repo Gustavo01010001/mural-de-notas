@@ -215,7 +215,17 @@ export function validateName(body = {}) {
   return name;
 }
 
-export const FOLDER_ICONS = ['📁', '💼', '📚', '💡', '✈️', '🍳', '🏠', '❤️', '🎯', '🎮', '🎵', '🛒', '💰', '🏋️', '🧠', '⭐'];
+export const FOLDER_ICONS = ['📁', '💼', '📚', '🎓', '📝', '💡', '✈️', '🍳', '🏠', '❤️', '🎯', '🎮', '🎵', '🛒', '💰', '🏋️', '🧠', '⭐'];
+
+// Um emoji só (aceita tom de pele e emojis compostos, como 👩‍💻)
+const ONE_EMOJI = /^\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}]|‍\p{Extended_Pictographic}️?)*$/u;
+
+function validateFolderIcon(icon) {
+  if (icon === undefined || icon === null || icon === '') return '📁';
+  const value = String(icon).trim();
+  if (value.length > 16 || !ONE_EMOJI.test(value)) throw new HttpError(400, 'O ícone da pasta precisa ser um emoji (ex.: 📚 ou 🎓).');
+  return value;
+}
 
 export function validateFolder(body = {}) {
   const name = String(body.name ?? '').trim().replace(/\s+/g, ' ');
@@ -223,7 +233,7 @@ export function validateFolder(body = {}) {
   if (name.length > 40) throw new HttpError(400, 'Nome da pasta muito longo (máx. 40).');
   return {
     name,
-    icon: FOLDER_ICONS.includes(body.icon) ? body.icon : '📁',
+    icon: validateFolderIcon(body.icon),
     color: NOTE_COLORS.includes(body.color) ? body.color : 'yellow',
     // subpasta de... (null = pasta principal)
     parentId: parseFolderId(body.parentId),

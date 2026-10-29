@@ -139,6 +139,10 @@ Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede qu
   o ID para o colega, que cola no campo "Convidar alguém". Aceita colado em minúsculas, sem hífen ou com
   espaços. O ID não revela o e-mail: a lista de participantes mostra **nome + ID**, nunca o e-mail.
   O ID é aleatório e sem letras que se confundem (0/O, 1/I/L); até 30 convites a cada 10 min por pessoa.
+- **Duas pessoas editando o mesmo post-it:** ninguém apaga o trabalho do outro sem saber. Se alguém mudar
+  enquanto sua janela está aberta, aparece "Fulano acabou de mudar este post-it"; ao salvar, você escolhe
+  **usar a versão dele(a)** ou **salvar a sua mesmo assim**. Lembretes, lixeira ("excluídos por mim") e backup
+  também incluem as pastas do grupo. Teste completo com 5 pessoas em [TESTE_GRUPO.md](TESTE_GRUPO.md).
 - **Ao vivo, como no Miro:** com a pasta aberta, cada pessoa vê o **cursor das outras com o nome**,
   as bolinhas de quem está na pasta agora e os post-its mudando na hora (sem recarregar).
   Funciona com Server-Sent Events (uma conexão aberta do servidor para o navegador), sem bibliotecas extras.

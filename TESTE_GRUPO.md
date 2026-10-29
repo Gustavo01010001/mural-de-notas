@@ -77,3 +77,18 @@ Para **ver no navegador**: abra três abas — `https://localhost:3000`, `https:
 `https://SEU_IP:3000` — e entre com uma conta diferente em cada. As senhas de teste geradas ficam em
 `backend/data/contas-grupo.json` (pasta que nunca vai para o GitHub). Se Maria e João já existirem com outra
 senha, passe `MARIA_PASS=... JOAO_PASS=...` antes do comando.
+
+---
+
+## ✅ Achados corrigidos (30/10/2026) — teste repetido: **25 OK · 0 falhas · 0 achados**
+
+| # | Como ficou | Conferido |
+|---|---|---|
+| G1/G2 | Cada post-it tem **versão** (sobe a cada mudança de texto, checklist ou data; arrastar não conta) e guarda **quem mudou por último**. Ao salvar, o app manda a versão que abriu: se alguém mudou no meio tempo, o back recusa (409) em vez de apagar. Na janela aparecem: 1) uma faixa **"Ana Clara acabou de mudar este post-it" → Carregar a versão nova** assim que a mudança chega ao vivo; 2) ao salvar mesmo assim, uma caixa com **a versão da outra pessoa** e as opções **Usar a versão de Ana** / **Salvar a minha mesmo assim**. Conflito consigo mesmo (outra aba) tem mensagem própria. | Script: 3 pessoas salvando juntas → 1 salva, 2 são avisadas; cópia velha do João → recusada, nada perdido. Navegador: João viu a faixa, depois a caixa, usou a versão da Ana, acrescentou a dele e salvou — ficou `131 respostas (Ana conferiu a planilha) · … · João: revisar gráfico 3`. |
+| G3 | O backup de quem participa traz as **pastas compartilhadas** (marcadas com a dona) e seus post-its; importar cria **"Nome (cópia do grupo)"** na conta de quem importou. | Teste automático + script. |
+| G4 | **Lembretes das pastas do grupo chegam para todos** que participam; quando alguém fecha o aviso, fecha **só para essa pessoa** (tabela `alert_dismissals`). | Teste automático (Igor fecha, Helena continua vendo; quem é de fora não recebe nem fecha). Navegador: "Próximas datas" do João mostra as reuniões do grupo. |
+| G5 | O que um convidado exclui aparece **na lixeira dele também** ("pasta de Maria"), com **Restaurar**; apagar de vez continua só com a dona. A contagem da lixeira inclui esses itens. | Teste automático + script. |
+| G6 | Ícone de pasta aceita **qualquer emoji** (🎓, 👩‍💻, 👍🏽…); o que não for emoji recebe "O ícone da pasta precisa ser um emoji". 🎓 e 📝 entraram na lista da tela. | Teste automático. |
+| G7 | O mural livre começa **abaixo da barra do topo** (76 px), com o cursor ao vivo e a posição de post-it novo ajustados. | 1366×768: 0 de 51 post-its atrás da barra. |
+
+Carga (180 pedidos de uma vez) nesta rodada: **p50 ≈ 290 ms · p95 ≈ 510 ms**, 0 erros.

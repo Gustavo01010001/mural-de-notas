@@ -84,6 +84,9 @@ const NOTE_MIGRATIONS = {
   remind_before: 'INTEGER NOT NULL DEFAULT 0', // aviso antecipado, em minutos
   repeat_rule: 'TEXT', // 'none' | 'weekly' | 'monthly' | 'yearly'
   created_by: 'INTEGER', // quem criou (em pasta compartilhada pode não ser o dono)
+  version: 'INTEGER NOT NULL DEFAULT 1', // sobe a cada mudança de conteúdo: detecta duas pessoas editando juntas
+  updated_by: 'INTEGER', // quem mudou o conteúdo por último
+  deleted_by: 'INTEGER', // quem mandou para a lixeira (pode ser um convidado da pasta)
 };
 const noteColumns = db.prepare('PRAGMA table_info(notes)').all().map((c) => c.name);
 for (const [col, type] of Object.entries(NOTE_MIGRATIONS)) {
@@ -139,6 +142,14 @@ for (const [col, type] of Object.entries(USER_MIGRATIONS)) {
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_code ON users(public_code) WHERE public_code IS NOT NULL;
+
+  -- Alertas fechados por convidados de pastas compartilhadas (o da dona fica no próprio post-it)
+  CREATE TABLE IF NOT EXISTS alert_dismissals (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    keys    TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (user_id, note_id)
+  );
 
   -- "Esqueci minha senha": guardamos só o hash do código, que vale 30 minutos e uma vez só
   CREATE TABLE IF NOT EXISTS password_resets (

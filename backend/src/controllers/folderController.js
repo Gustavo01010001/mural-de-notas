@@ -29,7 +29,7 @@ function ensureValidParent(userId, parentId, movingId = null) {
 
 export const FolderController = {
   list(req, res) {
-    const special = NoteModel.countSpecial(req.user.id);
+    const special = NoteModel.countSpecial(req.user.id, FolderModel.sharedFolderIds(req.user.id));
     res.json({
       folders: FolderModel.listByUser(req.user.id),
       shared: FolderModel.listSharedWith(req.user.id), // compartilhadas comigo

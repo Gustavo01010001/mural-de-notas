@@ -12,39 +12,53 @@ import { validateImage, validateNote, validatePosition, validateSize } from '../
 
 const MAX_IMPORT_NOTES = 3000;
 
+// Um post-it no formato do arquivo de backup (com a foto embutida)
+function serialize(ownerId, n, folderId = n.folderId) {
+  const img = n.hasImage ? NoteModel.getImage(ownerId, n.id) : null;
+  return {
+    id: n.id,
+    folderId,
+    title: n.title,
+    content: n.content,
+    color: n.color,
+    checklist: n.checklist,
+    tags: n.tags,
+    x: n.x,
+    y: n.y,
+    width: n.width,
+    height: n.height,
+    pinned: n.pinned,
+    status: n.status,
+    eventDate: n.eventDate,
+    eventType: n.eventType,
+    eventTime: n.eventTime,
+    remindBefore: n.remindBefore,
+    repeat: n.repeat,
+    image: img ? `data:${img.mime};base64,${Buffer.from(img.data).toString('base64')}` : null,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
+  };
+}
+
 export const AccountController = {
   // GET /account/export — tudo do usuário num arquivo JSON (inclusive fotos, arquivados e lixeira)
   export(req, res) {
     const userId = req.user.id;
     const folders = FolderModel.listByUser(userId).map(({ id, parentId, position, name, icon, color }) => ({ id, parentId, position, name, icon, color }));
     const rows = db.prepare('SELECT id FROM notes WHERE user_id = ? ORDER BY id').all(userId);
-    const notes = rows.map(({ id }) => {
-      const n = NoteModel.findById(userId, id);
-      const img = n.hasImage ? NoteModel.getImage(userId, id) : null;
-      return {
-        id: n.id,
-        folderId: n.folderId,
-        title: n.title,
-        content: n.content,
-        color: n.color,
-        checklist: n.checklist,
-        tags: n.tags,
-        x: n.x,
-        y: n.y,
-        width: n.width,
-        height: n.height,
-        pinned: n.pinned,
-        status: n.status,
-        eventDate: n.eventDate,
-        eventType: n.eventType,
-        eventTime: n.eventTime,
-        remindBefore: n.remindBefore,
-        repeat: n.repeat,
-        image: img ? `data:${img.mime};base64,${Buffer.from(img.data).toString('base64')}` : null,
-        createdAt: n.createdAt,
-        updatedAt: n.updatedAt,
-      };
-    });
+    const notes = rows.map(({ id }) => serialize(userId, NoteModel.findById(userId, id)));
+
+    // Pastas compartilhadas comigo também vão no backup (marcadas como do grupo): quem participa
+    // fica com uma cópia do que o grupo escreveu, mesmo que a dona saia ou exclua a conta.
+    for (const f of FolderModel.listSharedWith(userId)) {
+      const key = `grupo-${f.id}`;
+      folders.push({ id: key, parentId: null, position: 0, name: f.name, icon: f.icon, color: f.color, shared: true, ownerName: f.ownerName });
+      const groupNotes = db
+        .prepare('SELECT id FROM notes WHERE folder_id = ? AND deleted_at IS NULL ORDER BY id')
+        .all(f.id)
+        .map(({ id }) => NoteModel.findAnyById(id));
+      for (const n of groupNotes) notes.push({ ...serialize(n.ownerId, n, key), fromGroup: true });
+    }
     const backup = {
       app: 'mural-de-notas',
       version: 1,
@@ -83,7 +97,9 @@ export const AccountController = {
       const parentId = parentOld === null ? null : idMap.get(parentOld);
       if (parentId !== null && FolderModel.depthOf(parentId) >= MAX_DEPTH) continue;
       let name = String(f.name ?? 'Pasta').trim().slice(0, 30) || 'Pasta';
-      if (FolderModel.findByName(userId, name, parentId)) name = `${name} (importada)`;
+      // pasta que era de um grupo volta como uma cópia minha
+      if (f.shared) name = `${name.slice(0, 23)} (cópia do grupo)`;
+      if (FolderModel.findByName(userId, name, parentId)) name = `${name.slice(0, 18)} (importada)`;
       for (let i = 2; FolderModel.findByName(userId, name, parentId); i++) name = `${String(f.name).slice(0, 26)} (${i})`;
       const created = FolderModel.create(userId, { name, icon: f.icon, color: f.color, parentId });
       idMap.set(f.id, created.id);

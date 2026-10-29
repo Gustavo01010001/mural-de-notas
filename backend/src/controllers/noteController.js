@@ -1,5 +1,6 @@
 import { NoteModel, TRASH_DAYS } from '../models/noteModel.js';
 import { FolderModel } from '../models/folderModel.js';
+import { UserModel } from '../models/userModel.js';
 import { withCountdown } from '../services/alertService.js';
 import { listTags, searchNotes } from '../services/searchService.js';
 import { arrangeNotes } from '../services/arrangeService.js';
@@ -69,7 +70,15 @@ export const NoteController = {
   trash(req, res) {
     NoteModel.purgeOldTrash();
     const today = todayIn(req.query.tz);
-    res.json({ days: TRASH_DAYS, notes: NoteModel.listTrash(req.user.id).map((n) => withCountdown(n, today)) });
+    // inclui o que eu excluí em pastas compartilhadas comigo (aparece com o nome da dona; só ela apaga de vez)
+    const shared = FolderModel.sharedFolderIds(req.user.id);
+    const owners = new Map();
+    const ownerName = (id) => (owners.has(id) ? owners.get(id) : owners.set(id, UserModel.findById(id)?.name ?? '').get(id));
+    const notes = NoteModel.listTrash(req.user.id, shared).map((n) => ({
+      ...withCountdown(n, today),
+      ...(n.ownerId !== req.user.id ? { sharedTrash: true, ownerName: ownerName(n.ownerId), folderName: folderName(n.folderId) } : {}),
+    }));
+    res.json({ days: TRASH_DAYS, notes });
   },
 
   create(req, res) {
@@ -88,7 +97,19 @@ export const NoteController = {
 
   update(req, res) {
     const { note, ownerId } = noteAccess(req.user.id, parseId(req.params.id));
-    const updated = NoteModel.update(ownerId, note.id, validateNote(req.body));
+    // Duas pessoas editando o mesmo post-it: quem abriu uma versão antiga não apaga o que o outro fez sem saber.
+    // baseVersion = versão que a pessoa abriu; force = "salvar a minha mesmo assim".
+    const base = req.body?.baseVersion;
+    if (base !== undefined && base !== null && !req.body?.force && Number(base) !== note.version) {
+      const mine = note.updatedBy === req.user.id;
+      const by = mine ? 'Você' : UserModel.findById(note.updatedBy)?.name ?? 'Outra pessoa';
+      throw new HttpError(
+        409,
+        mine ? 'Você mudou este post-it em outra aba ou aparelho enquanto editava aqui.' : `${by} mudou este post-it enquanto você editava.`,
+        { conflict: { by, mine, note: view(note, req) } },
+      );
+    }
+    const updated = NoteModel.update(ownerId, note.id, validateNote(req.body), req.user.id);
     changed(updated, req);
     res.json({ message: 'Post-it atualizado!', note: view(updated, req) });
   },
@@ -123,7 +144,7 @@ export const NoteController = {
     const item = note.checklist.find((i) => i.id === req.params.itemId);
     if (!item) throw new HttpError(404, 'Item da checklist não encontrado.');
     const checklist = note.checklist.map((i) => (i.id === item.id ? { ...i, done: Boolean(req.body?.done) } : i));
-    const updated = NoteModel.setChecklist(ownerId, note.id, checklist);
+    const updated = NoteModel.setChecklist(ownerId, note.id, checklist, req.user.id);
     changed(updated, req);
     res.json({ note: view(updated, req) });
   },
@@ -164,7 +185,7 @@ export const NoteController = {
   // "Excluir" = mandar para a lixeira do dono (dá para desfazer)
   remove(req, res) {
     const { note, ownerId } = noteAccess(req.user.id, parseId(req.params.id));
-    NoteModel.moveToTrash(ownerId, note.id);
+    NoteModel.moveToTrash(ownerId, note.id, req.user.id);
     changed(note, req);
     res.json({ message: 'Post-it foi para a lixeira.', id: note.id });
   },
@@ -210,7 +231,7 @@ export const NoteController = {
         folders.add(target.folderId);
       }
       if (action === 'archive') NoteModel.setArchived(ownerId, note.id, true);
-      if (action === 'delete') NoteModel.moveToTrash(ownerId, note.id);
+      if (action === 'delete') NoteModel.moveToTrash(ownerId, note.id, req.user.id);
       if (action === 'pin' || action === 'unpin') NoteModel.setPinned(ownerId, note.id, action === 'pin');
       folders.add(note.folderId);
       done.push(note.id);

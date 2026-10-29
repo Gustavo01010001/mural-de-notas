@@ -4,6 +4,7 @@ import { currentDueKey, getAlerts, withCountdown } from '../services/alertServic
 import { HttpError } from '../utils/httpError.js';
 import { isValidDate, monthRange, occurrencesBetween, todayIn } from '../utils/dates.js';
 import { parseId } from '../utils/validators.js';
+import { noteAccess } from '../services/accessService.js';
 
 export const AlertController = {
   today(req, res) {
@@ -17,8 +18,12 @@ export const AlertController = {
     if (!/^\d{4}-\d{2}-\d{2}:(soon|due)$/.test(key) || !isValidDate(key.slice(0, 10))) {
       throw new HttpError(400, 'Alerta inválido.');
     }
-    const note = NoteModel.dismiss(req.user.id, id, key);
-    if (!note) throw new HttpError(404, 'Post-it não encontrado.');
+    const own = NoteModel.dismiss(req.user.id, id, key);
+    if (!own) {
+      // post-it de uma pasta compartilhada comigo: fecha só para mim
+      noteAccess(req.user.id, id); // 404 se não tenho acesso
+      NoteModel.dismissForMember(req.user.id, id, key);
+    }
     res.json({ message: 'Alerta fechado.' });
   },
 

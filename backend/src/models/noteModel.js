@@ -55,6 +55,9 @@ function toNote(row) {
     dismissed: parseDismissed(row.dismissed_on),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    version: row.version ?? 1,
+    updatedBy: row.updated_by ?? row.created_by ?? row.user_id,
+    deletedBy: row.deleted_by ?? null,
   };
 }
 
@@ -99,11 +102,33 @@ export const NoteModel = {
       .map(toNote);
   },
 
-  listTrash(userId) {
+  // Lixeira: o que é meu + o que EU excluí em pastas compartilhadas comigo (para eu mesmo poder desfazer)
+  listTrash(userId, sharedFolderIds = []) {
+    const shared = sharedFolderIds.length
+      ? `OR (n.deleted_by = ? AND n.folder_id IN (${sharedFolderIds.map(() => '?').join(',')}))`
+      : '';
     return db
-      .prepare(`${SELECT} WHERE n.user_id = ? AND n.deleted_at IS NOT NULL ORDER BY n.deleted_at DESC`)
-      .all(userId)
+      .prepare(`${SELECT} WHERE n.deleted_at IS NOT NULL AND (n.user_id = ? ${shared}) ORDER BY n.deleted_at DESC`)
+      .all(userId, ...(sharedFolderIds.length ? [userId, ...sharedFolderIds] : []))
       .map(toNote);
+  },
+
+  // Alertas fechados por um convidado (cada pessoa fecha o seu, sem fechar para o grupo)
+  memberDismissed(userId, noteIds) {
+    if (!noteIds.length) return new Map();
+    const rows = db
+      .prepare(`SELECT note_id, keys FROM alert_dismissals WHERE user_id = ? AND note_id IN (${noteIds.map(() => '?').join(',')})`)
+      .all(userId, ...noteIds);
+    return new Map(rows.map((r) => [r.note_id, parseJson(r.keys, [])]));
+  },
+
+  dismissForMember(userId, noteId, key) {
+    const current = this.memberDismissed(userId, [noteId]).get(noteId) ?? [];
+    const keys = [...new Set([...current, key])].slice(-12);
+    db.prepare(
+      `INSERT INTO alert_dismissals (user_id, note_id, keys) VALUES (?, ?, ?)
+       ON CONFLICT(user_id, note_id) DO UPDATE SET keys = excluded.keys`,
+    ).run(userId, noteId, JSON.stringify(keys));
   },
 
   listWithDates(userId) {
@@ -126,14 +151,23 @@ export const NoteModel = {
       .map(toNote);
   },
 
-  countSpecial(userId) {
-    return db
+  countSpecial(userId, sharedFolderIds = []) {
+    const counts = db
       .prepare(
         `SELECT SUM(deleted_at IS NOT NULL) AS trash,
                 SUM(deleted_at IS NULL AND archived_at IS NOT NULL) AS archived
            FROM notes WHERE user_id = ?`,
       )
       .get(userId);
+    // + o que eu excluí em pastas compartilhadas comigo (está na minha lixeira também)
+    if (sharedFolderIds.length) {
+      counts.trash =
+        (counts.trash ?? 0) +
+        db
+          .prepare(`SELECT COUNT(*) AS c FROM notes WHERE deleted_at IS NOT NULL AND deleted_by = ? AND folder_id IN (${sharedFolderIds.map(() => '?').join(',')})`)
+          .get(userId, ...sharedFolderIds).c;
+    }
+    return counts;
   },
 
   maxZ(userId) {
@@ -174,7 +208,7 @@ export const NoteModel = {
     return this.findById(userId, Number(result.lastInsertRowid));
   },
 
-  update(userId, id, n) {
+  update(userId, id, n, actorId = userId) {
     // Mudou data, hora ou aviso? Então os alertas voltam a valer.
     db.prepare(
       `UPDATE notes
@@ -182,7 +216,7 @@ export const NoteModel = {
               dismissed_on = CASE WHEN event_date IS ? AND event_time IS ? AND remind_before = ? AND repeat_rule IS ?
                                   THEN dismissed_on ELSE NULL END,
               event_date = ?, event_type = ?, repeat_yearly = ?, event_time = ?, remind_before = ?, repeat_rule = ?,
-              updated_at = datetime('now')
+              updated_at = datetime('now'), version = version + 1, updated_by = ?
         WHERE id = ? AND user_id = ?`,
     ).run(
       n.title,
@@ -200,6 +234,7 @@ export const NoteModel = {
       n.eventTime ?? null,
       n.remindBefore ?? 0,
       n.repeat ?? 'none',
+      actorId,
       id,
       userId,
     );
@@ -220,12 +255,10 @@ export const NoteModel = {
     return this.findById(userId, id);
   },
 
-  setChecklist(userId, id, checklist) {
-    db.prepare(`UPDATE notes SET checklist = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`).run(
-      JSON.stringify(checklist),
-      id,
-      userId,
-    );
+  setChecklist(userId, id, checklist, actorId = userId) {
+    db.prepare(
+      `UPDATE notes SET checklist = ?, updated_at = datetime('now'), version = version + 1, updated_by = ? WHERE id = ? AND user_id = ?`,
+    ).run(JSON.stringify(checklist), actorId, id, userId);
     return this.findById(userId, id);
   },
 
@@ -261,16 +294,15 @@ export const NoteModel = {
   },
 
   // Lixeira: "excluir" só marca a data; dá para desfazer/restaurar por 30 dias
-  moveToTrash(userId, id) {
-    db.prepare(`UPDATE notes SET deleted_at = datetime('now') WHERE id = ? AND user_id = ? AND deleted_at IS NULL`).run(
-      id,
-      userId,
-    );
+  moveToTrash(userId, id, actorId = userId) {
+    db.prepare(
+      `UPDATE notes SET deleted_at = datetime('now'), deleted_by = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+    ).run(actorId, id, userId);
     return this.findById(userId, id);
   },
 
   restore(userId, id) {
-    db.prepare('UPDATE notes SET deleted_at = NULL, z_index = ? WHERE id = ? AND user_id = ?').run(
+    db.prepare('UPDATE notes SET deleted_at = NULL, deleted_by = NULL, z_index = ? WHERE id = ? AND user_id = ?').run(
       this.maxZ(userId) + 1,
       id,
       userId,

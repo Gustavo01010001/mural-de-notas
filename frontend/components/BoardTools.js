@@ -38,6 +38,8 @@ export function BoardTools({
   onFit,
   onArrange,
   onArrangeSubject,
+  onArrangeMap,
+  hasLinks,
   arranging,
   onSelectMode,
   selecting,
@@ -72,6 +74,7 @@ export function BoardTools({
   };
 
   const items = [
+    showFreeTools && hasNotes && { icon: 'mindmap', label: 'Organizar como mapa de ideias', hint: hasLinks ? 'Ligados perto, o mais conectado no centro — sem grade' : 'Ligue post-its com fios para formar o mapa', fn: onArrangeMap, disabled: arranging },
     showFreeTools && hasNotes && { icon: 'layers', label: 'Organizar por assunto', hint: 'Junta os post-its pela 1ª #etiqueta', fn: onArrangeSubject, disabled: arranging },
     showFreeTools && hasNotes && { icon: 'grid', label: arranging ? 'Arrumando…' : 'Arrumar em grade', hint: 'Organiza os post-its lado a lado', fn: onArrange, disabled: arranging },
     hasNotes && { icon: 'checkSquare', label: selecting ? 'Cancelar seleção' : 'Selecionar vários', hint: 'Mover, arquivar ou excluir de uma vez', fn: onSelectMode },

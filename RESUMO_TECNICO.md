@@ -116,6 +116,11 @@ em BLOB), `folders` (dono, nome, ícone, cor, pai, posição), `folder_members`,
 | Espaço livre medido em telas (`calc(… + 100vw/100vh)`) | sobra espaço para mover em qualquer zoom (em pixels do mural ele encolhia no zoom baixo) |
 | Setas em tabela própria `note_links` (ON DELETE CASCADE) | some sozinha ao apagar o post-it; na lixeira só fica escondida |
 | "Organizar por assunto" no back (`arrangeBySubject`) | etiqueta de 1 post-it vai para "outros" — evita dezenas de blocos de 1 |
+| Mapa de ideias calculado na tela (`lib/mindMap.js`) + `POST /notes/positions` | usa o tamanho real medido dos post-its; a mesma rota serve ao Desfazer |
+| Árvore radial + separação de retângulos | ligados perto, fatia por ramo (menos fios cruzando), zero sobreposição |
+| "Seguir o fio" por classes no DOM (sem estado do React) | passar o mouse não redesenha 50 post-its |
+| Barrinha do fio numa camada própria acima dos post-its | nunca fica escondida atrás de um papel |
+| Ligar também pela lista no post-it aberto | alternativa ao arraste: teclado, leitor de tela, dificuldade motora (IHC/Tanaka) |
 
 ## 6. Como rodar e testar
 

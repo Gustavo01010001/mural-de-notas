@@ -55,6 +55,11 @@ export default function NoteModal({
   onClose,
   onSave,
   onRebase,
+  links = [], // fios da pasta
+  folderNotes = [], // post-its da pasta (para escolher a quem ligar)
+  onLink, // (fromId, toId)
+  onUnlink, // (linkId)
+  onGoTo, // (noteId) fecha e leva a tela até o post-it
 }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -380,6 +385,12 @@ export default function NoteModal({
             )}
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickImage} />
 
+            {/* Notas relacionadas (quadro de detetive): o que está ligado a este post-it por um fio.
+                Também é o jeito de ligar SEM arrastar — teclado, leitor de tela, quem tem dificuldade motora. */}
+            {note && onLink && (
+              <RelatedNotes note={note} links={links} folderNotes={folderNotes} onLink={onLink} onUnlink={onUnlink} onGoTo={onGoTo} />
+            )}
+
             {/* Projeto minimalista: o básico à vista; o resto a pessoa adiciona se quiser */}
             {addable.length > 0 && (
               <div className="add-extras" role="group" aria-label="Adicionar ao post-it">
@@ -579,5 +590,61 @@ export default function NoteModal({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+const THREAD_HEX = { red: '#d62f2f', blue: '#2f7fd6', green: '#2f9e44', yellow: '#e8a10c', purple: '#8e44c9' };
+
+function RelatedNotes({ note, links, folderNotes, onLink, onUnlink, onGoTo }) {
+  const byId = new Map(folderNotes.map((n) => [n.id, n]));
+  const mine = links
+    .filter((l) => l.fromId === note.id || l.toId === note.id)
+    .map((l) => ({ link: l, other: byId.get(l.fromId === note.id ? l.toId : l.fromId) }))
+    .filter((x) => x.other);
+  const linked = new Set(mine.map((x) => x.other.id));
+  const candidates = folderNotes.filter((n) => n.id !== note.id && !linked.has(n.id)).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+
+  return (
+    <div className="modal-section related">
+      <span className="modal-label">
+        <Icon name="link" size={15} /> Ligado a {mine.length > 0 && <small>({mine.length})</small>}
+      </span>
+      {mine.length > 0 && (
+        <ul className="related-list">
+          {mine.map(({ link, other }) => (
+            <li key={link.id}>
+              <span className="related-dot" style={{ background: THREAD_HEX[link.color] ?? THREAD_HEX.red }} aria-hidden />
+              <span className="related-title">{other.title}</span>
+              <button type="button" className="btn-small ghost" onClick={() => onGoTo?.(other.id)} title="Fechar e ir até este post-it">
+                Ir até
+              </button>
+              <button type="button" className="icon-mini" onClick={() => onUnlink?.(link.id)} aria-label={`Desligar de ${other.title}`} title="Desligar (tirar o fio)">
+                <Icon name="x" size={13} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {candidates.length > 0 && (
+        <label className="related-add">
+          <span className="sr-only">Ligar este post-it a outro</span>
+          <select
+            value=""
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              if (id) onLink(note.id, id);
+            }}
+          >
+            <option value="">＋ Ligar a outro post-it…</option>
+            {candidates.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <small className="related-hint">As ligações são salvas na hora (não precisa clicar em Salvar).</small>
+    </div>
   );
 }

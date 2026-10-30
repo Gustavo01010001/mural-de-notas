@@ -69,7 +69,7 @@ export const AccountController = {
       folders,
       notes,
       // setas entre post-its (só as minhas; as do grupo são da dona da pasta)
-      links: LinkModel.listByOwner(userId).map((l) => ({ from: l.fromId, to: l.toId })),
+      links: LinkModel.listByOwner(userId).map((l) => ({ from: l.fromId, to: l.toId, color: l.color })),
     };
     const day = new Date().toISOString().slice(0, 10);
     res.set('Content-Disposition', `attachment; filename="mural-de-notas-backup-${day}.json"`);
@@ -150,7 +150,7 @@ export const AccountController = {
       const b = noteMap.get(l.to);
       if (!a || !b || a === b || LinkModel.findBetween(a, b)) continue;
       if (NoteModel.findById(userId, a)?.folderId !== NoteModel.findById(userId, b)?.folderId) continue;
-      LinkModel.create(userId, a, b, userId);
+      LinkModel.create(userId, a, b, userId, ['red', 'blue', 'green', 'yellow', 'purple'].includes(l.color) ? l.color : 'red');
       links++;
     }
     res.json({

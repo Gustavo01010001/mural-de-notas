@@ -15,6 +15,7 @@ import {
   validateImage,
   validateNote,
   validatePosition,
+  validatePositions,
   validateSize,
 } from '../utils/validators.js';
 
@@ -272,6 +273,20 @@ export const NoteController = {
       groups: plan.groups,
       notes: NoteModel.listByFolder(access.ownerId, access.folderId).map((n) => withCountdown(n, today)),
     });
+  },
+
+  // POST /notes/positions { folderId, positions: [{ id, x, y }] }
+  // Usado pelo "Organizar como mapa de ideias" (calculado na tela) e pelo "Desfazer" das arrumações.
+  setPositions(req, res) {
+    const access = folderAccess(req.user.id, req.body?.folderId);
+    const wanted = validatePositions(req.body);
+    // só post-its desta pasta (ativos); o resto é ignorado
+    const mine = new Set(NoteModel.listByFolder(access.ownerId, access.folderId).map((n) => n.id));
+    const positions = wanted.filter((p) => mine.has(p.id));
+    NoteModel.setPositions(access.ownerId, positions);
+    live.notify(access.folderId, req.user.id);
+    const today = todayIn(req.query.tz);
+    res.json({ moved: positions.length, notes: NoteModel.listByFolder(access.ownerId, access.folderId).map((n) => withCountdown(n, today)) });
   },
 
   // ----- foto -----

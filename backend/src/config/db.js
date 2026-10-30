@@ -185,3 +185,8 @@ db.exec(`
     }
   }
 }
+
+// Fios do "quadro de detetive": cada um pode ter uma cor (separa tipos de relação)
+if (!db.prepare('PRAGMA table_info(note_links)').all().some((c) => c.name === 'color')) {
+  db.exec("ALTER TABLE note_links ADD COLUMN color TEXT NOT NULL DEFAULT 'red'");
+}

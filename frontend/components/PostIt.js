@@ -70,6 +70,7 @@ export default function PostIt({
   linkMode = false, // escolhendo o post-it de destino de uma seta
   onLinkStart, // começar uma seta a partir deste post-it (arrastando a bolinha ou pelo menu)
   onLinkTarget, // este post-it foi escolhido como destino
+  linkCount = 0, // quantos fios saem dele (indicador na grade do celular)
 }) {
   const [pos, setPos] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ width: note.width, height: note.height });
@@ -266,7 +267,13 @@ export default function PostIt({
     >
       {note.pinned ? <span className="postit-pin" title="Fixado no topo">📌</span> : <span className="postit-tape" />}
 
-      {/* bolinha de conexão: arraste até outro post-it para ligar os dois com uma seta */}
+      {linkCount > 0 && (
+        <span className="link-count" title={`Ligado a ${linkCount} post-it${linkCount === 1 ? '' : 's'}`}>
+          <Icon name="link" size={12} /> {linkCount}
+        </span>
+      )}
+
+      {/* bolinha de conexão: arraste até outro post-it para ligar os dois com um fio */}
       {!grid && !selecting && !linkMode && onLinkStart && (
         <span
           className="link-handle hover-only"

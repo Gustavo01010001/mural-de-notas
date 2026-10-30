@@ -1,12 +1,14 @@
 import { db } from '../config/db.js';
 
 export const MAX_LINKS_PER_FOLDER = 300;
+export const LINK_COLORS = ['red', 'blue', 'green', 'yellow', 'purple'];
 
 const toLink = (row) =>
   row && {
     id: row.id,
     fromId: row.from_id,
     toId: row.to_id,
+    color: row.color ?? 'red',
     createdBy: row.created_by ?? null,
     createdAt: row.created_at,
   };
@@ -49,9 +51,16 @@ export const LinkModel = {
       .get(ownerId, folderId).c;
   },
 
-  create(ownerId, fromId, toId, createdBy) {
-    const r = db.prepare('INSERT INTO note_links (owner_id, from_id, to_id, created_by) VALUES (?, ?, ?, ?)').run(ownerId, fromId, toId, createdBy);
+  create(ownerId, fromId, toId, createdBy, color = 'red') {
+    const r = db
+      .prepare('INSERT INTO note_links (owner_id, from_id, to_id, created_by, color) VALUES (?, ?, ?, ?, ?)')
+      .run(ownerId, fromId, toId, createdBy, color);
     return this.findById(Number(r.lastInsertRowid));
+  },
+
+  setColor(id, color) {
+    db.prepare('UPDATE note_links SET color = ? WHERE id = ?').run(color, id);
+    return this.findById(id);
   },
 
   remove(id) {

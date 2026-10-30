@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   mobileLayout: 'grid',
   // Aparência e acessibilidade
   theme: 'dark',
+  linkStyle: 'thread', // conexões entre post-its: fio de detetive
   fontScale: 1,
   highContrast: false,
   sounds: false,

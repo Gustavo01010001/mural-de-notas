@@ -202,3 +202,24 @@ seta escondia o ✕.
 
 **Não testado com mouse real:** arrastar um post-it até a borda (rolagem automática) e a seta acompanhando
 durante o arraste — testados pelo código e por eventos simulados, não com a mão no mouse.
+
+# ✅ Rodada 8 — Quadro de detetive (30/10/2026)
+
+**Automáticos:** `npm test` → **81/81** (novos: cor do fio — padrão vermelho, outra cor na criação, trocar,
+cor inválida 400, estranho 404; posições em lote só na própria pasta, estranho 404, lista vazia 400; estilo
+`linkStyle` nas configurações). Algoritmo do mapa (lib/mindMap.js) testado à parte: 15 post-its, 2 mapas,
+**0 sobreposições**, ligados a ~370–440 px do centro.
+
+**Navegador (pasta "Caso: o projeto sumido", 10 post-its, 9 fios de 4 cores):**
+- Antes: post-its espalhados, fios cruzando. **Organizar como mapa de ideias** → "O caso" no centro, pistas e
+  suspeitos ao redor, avulsos ao lado, **0 sobreposições**; **Desfazer** devolveu cada post-it ao lugar.
+- Seguir o fio: em "Pista: backup do Bruno" acenderam 2 fios e apagaram 7; "O caso" e "Próximo passo" em destaque.
+- Clique no fio → barrinha com 5 cores + ✕; trocar amarelo → azul gravou no servidor.
+- Post-it aberto → "Ligado a" com 6; o seletor só oferece quem ainda não está ligado; ligar "Ideia solta" pela
+  lista; **Ir até** fechou e fez a "Linha do tempo" brilhar.
+- Configurações: Fio ↔ Seta (com seta as tachinhas somem). Tema claro legível. Celular em grade: indicador
+  🔗 N (O caso 🔗 7), sem erros.
+
+**Ajustado durante o teste:** mapa muito apertado (fios escondidos atrás dos papéis) → mais espaço entre os
+anéis; barrinha do fio podia ficar atrás de um post-it → camada própria por cima; Desfazer das arrumações
+passou para 12 s; post-its do minimapa sumiam no tema claro → contorno.

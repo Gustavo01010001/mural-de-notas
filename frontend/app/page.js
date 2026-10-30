@@ -23,7 +23,8 @@ import { useLiveFolder } from '@/lib/useLiveFolder';
 import { flattenTree } from '@/lib/folderTree';
 import { BoardTools, SelectionBar } from '@/components/BoardTools';
 import { boardStyles, useInfiniteBoard, ZOOM_MAX, ZOOM_MIN } from '@/lib/useInfiniteBoard';
-import { LinksLayer, Minimap, noteRect, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
+import { LinksLayer, Minimap, noteRect, PinsLayer, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
+import { mindMapLayout } from '@/lib/mindMap';
 import { useWeather } from '@/lib/useWeather';
 import { applyAppearance } from '@/lib/appearance';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
@@ -51,6 +52,7 @@ const DEFAULT_SETTINGS = {
   defaultColor: 'yellow',
   mobileLayout: 'grid',
   theme: 'dark',
+  linkStyle: 'thread',
   fontScale: 1,
   highContrast: false,
   sounds: false,
@@ -603,10 +605,12 @@ export default function BoardPage() {
   }
 
   // Mostra um aviso com "Desfazer" (o mesmo desfazer também roda com Ctrl+Z por alguns segundos)
-  function offerUndo(message, undo, type = 'trash') {
-    const entry = { undo, until: Date.now() + 7000 };
+  // ms: quanto tempo o Desfazer fica disponível (arrumar o mural inteiro pede mais tempo para olhar e decidir)
+  function offerUndo(message, undo, type = 'trash', ms = 7000) {
+    const entry = { undo, until: Date.now() + ms };
     lastUndo.current = entry;
     toast(message, type, {
+      duration: ms,
       action: {
         label: 'Desfazer',
         onClick: () => {
@@ -773,7 +777,46 @@ export default function BoardPage() {
   }
 
   // ----- arrumar mural -----
+  // Volta os post-its para onde estavam antes de uma arrumação automática
+  async function restorePositions(snapshot, folderId) {
+    try {
+      const data = await api('/notes/positions', { method: 'POST', body: { folderId, positions: snapshot } });
+      if (folderRef.current === folderId) setNotes(data.notes);
+      toast('Os post-its voltaram para onde estavam.', 'info');
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  // "Organizar como mapa de ideias": ligados perto uns dos outros, o mais conectado no centro; sem grade
+  async function arrangeMindMap() {
+    const folderId = currentFolder;
+    const snapshot = notes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
+    const { positions, maps } = mindMapLayout(notes, links, sizes, { maxWidth: Math.max(1800, (window.innerWidth / 0.55) | 0) });
+    setArranging(true);
+    try {
+      const data = await api('/notes/positions', { method: 'POST', body: { folderId, positions } });
+      setNotes(data.notes);
+      setTimeout(() => fitRef.current(), 650);
+      playSound('pop');
+      offerUndo(
+        maps
+          ? `Organizado como mapa de ideias: ${maps} grupo${maps === 1 ? '' : 's'} ligado${maps === 1 ? '' : 's'} por fios. 🧵`
+          : 'Nenhum fio ainda: espalhei os post-its com folga. Dica: ligue post-its para formar o mapa.',
+        () => restorePositions(snapshot, folderId),
+        'success',
+        12000,
+      );
+    } catch (err) {
+      handleAuthError(err);
+    } finally {
+      setTimeout(() => setArranging(false), 900);
+    }
+  }
+
   async function handleArrange(mode) {
+    const arrangeFolder = currentFolder;
+    const beforeArrange = notes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
     const usable = (window.innerWidth / zoom) - 80;
     const widest = Math.max(230, ...notes.map((n) => n.width ?? 230)) + 30;
     // por assunto: largura pensada para tudo caber no formato da tela (mais largo que alto)
@@ -792,7 +835,7 @@ export default function BoardPage() {
         savePref(SUBJECTS_KEY, true);
         setTimeout(() => fitRef.current(), 650);
       } else boardRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-      toast(data.message, 'success');
+      offerUndo(data.message, () => restorePositions(beforeArrange, arrangeFolder), 'success', 12000);
     } catch (err) {
       handleAuthError(err);
     } finally {
@@ -988,6 +1031,60 @@ export default function BoardPage() {
     }
   }
 
+  async function recolorLink(id, color) {
+    const before = links.find((l) => l.id === id)?.color;
+    setLinks((list) => list.map((l) => (l.id === id ? { ...l, color } : l)));
+    try {
+      await api(`/links/${id}`, { method: 'PATCH', body: { color } });
+    } catch (err) {
+      setLinks((list) => list.map((l) => (l.id === id ? { ...l, color: before } : l)));
+      handleAuthError(err);
+    }
+  }
+
+  // quantos fios cada post-it tem (o indicador 🔗 aparece na grade do celular, onde os fios não são desenhados)
+  const linkCount = {};
+  for (const l of links) {
+    linkCount[l.fromId] = (linkCount[l.fromId] ?? 0) + 1;
+    linkCount[l.toId] = (linkCount[l.toId] ?? 0) + 1;
+  }
+
+  // "Seguir o fio": passar o mouse num post-it acende os fios dele e apaga os outros.
+  // Feito direto nas classes (sem redesenhar o mural a cada movimento do mouse).
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || gridMode) return;
+    let cur = null;
+    const set = (id) => {
+      if (id === cur) return;
+      cur = id;
+      const layer = layerRef.current;
+      if (!layer) return;
+      layer.querySelectorAll('.link.focus, .pin.focus, .postit.is-related').forEach((el) => el.classList.remove('focus', 'is-related'));
+      const lines = id ? layer.querySelectorAll(`.link[data-a="${id}"], .link[data-b="${id}"]`) : [];
+      layer.classList.toggle('has-focus', lines.length > 0);
+      lines.forEach((g) => {
+        g.classList.add('focus');
+        const other = g.dataset.a === String(id) ? g.dataset.b : g.dataset.a;
+        layer.querySelector(`[data-note-id="${other}"]`)?.classList.add('is-related');
+        layer.querySelector(`.pin[data-note="${other}"]`)?.classList.add('focus');
+      });
+      if (lines.length) layer.querySelector(`.pin[data-note="${id}"]`)?.classList.add('focus');
+    };
+    const over = (e) => {
+      if (e.buttons) return; // arrastando: não muda o foco
+      set(Number(e.target.closest?.('[data-note-id]')?.dataset.noteId) || null);
+    };
+    const leave = () => set(null);
+    board.addEventListener('mouseover', over);
+    board.addEventListener('mouseleave', leave);
+    return () => {
+      board.removeEventListener('mouseover', over);
+      board.removeEventListener('mouseleave', leave);
+      set(null);
+    };
+  }, [gridMode, currentFolder]);
+
   // começar uma seta: arrastando a bolinha do post-it (e) ou pelo menu ⋯ (sem e: depois clica no destino)
   const startLink = (note, e) => {
     if (e) setLinking({ from: note.id, to: toBoard(e.clientX, e.clientY), drag: true });
@@ -1161,6 +1258,9 @@ export default function BoardPage() {
                 drag={liveDrag}
                 preview={linking?.to ? { from: linking.from, to: linking.to } : null}
                 onRemove={removeLink}
+                onColor={recolorLink}
+                style={settings.linkStyle}
+                zoom={z}
               />
             )}
             <AnimatePresence>
@@ -1193,9 +1293,11 @@ export default function BoardPage() {
                   linkMode={Boolean(linking) && !linking.drag}
                   onLinkStart={gridMode ? undefined : startLink}
                   onLinkTarget={handleLinkTarget}
+                  linkCount={gridMode ? linkCount[note.id] ?? 0 : 0}
                 />
               ))}
             </AnimatePresence>
+            {!gridMode && settings.linkStyle !== 'arrow' && <PinsLayer links={links} notes={visibleNotes} sizes={sizes} drag={liveDrag} />}
             {liveEnabled && !gridMode && <LiveCursors cursors={live.cursors} />}
           </div>
         </motion.div>
@@ -1228,6 +1330,8 @@ export default function BoardPage() {
           onFit={fitAll}
           onArrange={() => handleArrange()}
           onArrangeSubject={() => handleArrange('subject')}
+          onArrangeMap={arrangeMindMap}
+          hasLinks={links.length > 0}
           showSubjects={showSubjects}
           onToggleSubjects={() => (setShowSubjects(!showSubjects), savePref(SUBJECTS_KEY, !showSubjects))}
           showMinimap={showMinimap}
@@ -1396,6 +1500,14 @@ export default function BoardPage() {
         latest={modal.note ? notes.find((n) => n.id === modal.note.id) ?? null : null}
         whoChanged={changedByName(modal.note ? notes.find((n) => n.id === modal.note.id) : null)}
         onRebase={(fresh) => setModal((m) => ({ ...m, note: fresh }))}
+        links={links}
+        folderNotes={notes}
+        onLink={createLink}
+        onUnlink={removeLink}
+        onGoTo={(id) => {
+          closeModal();
+          setTimeout(() => focusNote(id), 250);
+        }}
         defaultColor={settings.defaultColor}
         folders={isSharedWithMe ? [{ ...currentInfo, depth: 1 }] : flattenTree(folders)}
         sharedLocked={isSharedWithMe}

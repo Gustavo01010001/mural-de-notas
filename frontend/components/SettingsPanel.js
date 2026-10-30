@@ -165,6 +165,16 @@ export default function SettingsPanel({
                   ]}
                 />
                 <Segmented
+                  label="Ligações entre post-its"
+                  value={settings.linkStyle ?? 'thread'}
+                  onChange={set('linkStyle')}
+                  options={[
+                    { id: 'thread', icon: 'link', label: 'Fio' },
+                    { id: 'arrow', icon: 'mindmap', label: 'Seta' },
+                  ]}
+                />
+                <small className="set-hint">Fio: barbante com tachinhas, como num quadro de detetive. Seta: linha simples.</small>
+                <Segmented
                   label="Tamanho da letra"
                   value={settings.fontScale}
                   onChange={set('fontScale')}

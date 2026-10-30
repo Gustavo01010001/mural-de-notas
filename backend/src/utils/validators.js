@@ -146,6 +146,14 @@ export function validateBatch(body = {}) {
   return { ids, action };
 }
 
+// "Mapa de ideias" e "Desfazer" das arrumações: várias posições de uma vez
+export function validatePositions(body = {}) {
+  const list = Array.isArray(body.positions) ? body.positions : null;
+  if (!list || !list.length) throw new HttpError(400, 'Nenhuma posição enviada.');
+  if (list.length > 1000) throw new HttpError(400, 'Posições demais de uma vez (máx. 1000).');
+  return list.map((p) => ({ id: parseId(p?.id), ...validatePosition(p) }));
+}
+
 export function validatePosition(body = {}) {
   const x = Number(body.x);
   const y = Number(body.y);
@@ -194,6 +202,7 @@ export function validateSettings(body = {}, current) {
     focusMinutes: [15, 25, 45, 50], // modo foco (Pomodoro)
     breakMinutes: [5, 10, 15],
     autoCalmAfter: [0, 30, 60, 120], // minutos de uso até ligar o modo confortável sozinho
+    linkStyle: ['thread', 'arrow'], // conexões: fio de detetive (com tachinhas) ou seta simples
   };
   for (const [key, allowed] of Object.entries(enums)) {
     if (key in body) {

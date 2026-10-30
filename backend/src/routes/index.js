@@ -49,6 +49,7 @@ router.post('/live/folders/:id/cursor', requireAuth, LiveController.cursor);
 // Conexões entre post-its (mural infinito)
 router.get('/links', requireAuth, LinkController.list);
 router.post('/links', requireAuth, LinkController.create);
+router.patch('/links/:id', requireAuth, LinkController.update);
 router.delete('/links/:id', requireAuth, LinkController.remove);
 
 router.get('/notes', requireAuth, NoteController.list);
@@ -59,6 +60,7 @@ router.get('/notes/trash', requireAuth, NoteController.trash);
 router.delete('/notes/trash', requireAuth, NoteController.emptyTrash);
 router.post('/notes/batch', requireAuth, NoteController.batch);
 router.post('/notes/arrange', requireAuth, NoteController.arrange);
+router.post('/notes/positions', requireAuth, NoteController.setPositions);
 router.post('/notes', requireAuth, NoteController.create);
 router.put('/notes/:id', requireAuth, NoteController.update);
 router.patch('/notes/:id/position', requireAuth, NoteController.move);

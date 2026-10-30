@@ -1349,3 +1349,63 @@ describe('Mural infinito: conexões entre post-its e organizar por assunto', () 
     assert.equal((await call(`/links?folder=${f.id}`, { token: outroUser.token })).data.links.length, backup.links.length);
   });
 });
+
+describe('Quadro de detetive: cor dos fios, posições em lote e estilo', () => {
+  let u, outro, folder, a, b, c;
+  const mk = (token, body) => call('/notes', { method: 'POST', token, body }).then((r) => r.data.note);
+
+  before(async () => {
+    u = await newUser('Olga');
+    outro = await newUser('Pedro');
+    folder = (await call('/folders', { method: 'POST', token: u.token, body: { name: 'Investigação' } })).data.folder;
+    a = await mk(u.token, { title: 'Pistas', folderId: folder.id });
+    b = await mk(u.token, { title: 'Suspeitos', folderId: folder.id });
+    c = await mk(u.token, { title: 'Linha do tempo', folderId: folder.id });
+  });
+
+  test('fio nasce vermelho, aceita outra cor e troca de cor', async () => {
+    const r1 = await call('/links', { method: 'POST', token: u.token, body: { fromId: a.id, toId: b.id } });
+    assert.equal(r1.data.link.color, 'red');
+    const r2 = await call('/links', { method: 'POST', token: u.token, body: { fromId: b.id, toId: c.id, color: 'blue' } });
+    assert.equal(r2.data.link.color, 'blue');
+    assert.equal((await call('/links', { method: 'POST', token: u.token, body: { fromId: a.id, toId: c.id, color: 'rosa-choque' } })).status, 400);
+    const p = await call(`/links/${r1.data.link.id}`, { method: 'PATCH', token: u.token, body: { color: 'green' } });
+    assert.equal(p.status, 200);
+    assert.equal(p.data.link.color, 'green');
+    assert.equal((await call(`/links/${r1.data.link.id}`, { method: 'PATCH', token: u.token, body: { color: 'xadrez' } })).status, 400);
+    assert.equal((await call(`/links/${r1.data.link.id}`, { method: 'PATCH', token: outro.token, body: { color: 'blue' } })).status, 404);
+    const list = (await call(`/links?folder=${folder.id}`, { token: u.token })).data.links;
+    assert.deepEqual(list.map((l) => l.color).sort(), ['blue', 'green']);
+  });
+
+  test('posições em lote: move só os post-its desta pasta; estranho não mexe', async () => {
+    const longe = await mk(u.token, { title: 'Em outra pasta' });
+    const r = await call('/notes/positions', {
+      method: 'POST',
+      token: u.token,
+      body: {
+        folderId: folder.id,
+        positions: [
+          { id: a.id, x: 500, y: 300 },
+          { id: b.id, x: 900, y: 320 },
+          { id: longe.id, x: 1, y: 1 }, // de outra pasta: ignorado
+        ],
+      },
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.equal(r.data.moved, 2);
+    const pos = Object.fromEntries(r.data.notes.map((n) => [n.title, [n.x, n.y]]));
+    assert.deepEqual(pos.Pistas, [500, 300]);
+    assert.deepEqual(pos.Suspeitos, [900, 320]);
+    const ainda = (await call('/notes?folder=root', { token: u.token })).data.notes.find((n) => n.id === longe.id);
+    assert.notDeepEqual([ainda.x, ainda.y], [1, 1]);
+    assert.equal((await call('/notes/positions', { method: 'POST', token: outro.token, body: { folderId: folder.id, positions: [{ id: a.id, x: 0, y: 0 }] } })).status, 404);
+    assert.equal((await call('/notes/positions', { method: 'POST', token: u.token, body: { folderId: folder.id, positions: [] } })).status, 400);
+  });
+
+  test('estilo das conexões nas configurações: fio (padrão) ou seta', async () => {
+    assert.equal((await call('/settings', { token: u.token })).data.settings.linkStyle, 'thread');
+    assert.equal((await call('/settings', { method: 'PUT', token: u.token, body: { linkStyle: 'arrow' } })).data.settings.linkStyle, 'arrow');
+    assert.equal((await call('/settings', { method: 'PUT', token: u.token, body: { linkStyle: 'laser' } })).status, 400);
+  });
+});

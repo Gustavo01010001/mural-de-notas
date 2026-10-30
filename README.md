@@ -166,6 +166,27 @@ Setas também valem nas **pastas compartilhadas** (o grupo vê na hora), vão no
 com o post-it na lixeira. Por desempenho, o zoom e o movimento são aplicados direto na tela durante o gesto e
 só depois gravados (nada de redesenhar todos os post-its a cada movimento).
 
+## 🧵 Quadro de detetive (ligar ideias com fios)
+
+Para ligar o que tem relação — tema do TCC às referências, cliente às tarefas, remédio ao horário — como num
+quadro de investigação, **sem virar bagunça**:
+
+- **Fio com tachinhas:** a ligação é um barbante preso por uma tachinha no topo de cada post-it, caindo um
+  pouco no meio (gravidade). **5 cores** (vermelho, azul, verde, amarelo, roxo) para separar tipos de relação.
+  Prefere linha simples? Configurações → Aparência → *Ligações entre post-its*: **Fio** ou **Seta**.
+- **Ligar:** arraste a bolinha da borda do post-it até outro **ou** abra o post-it → **"Ligado a" → ＋ Ligar a
+  outro post-it…** (escolhe da lista — dá para fazer só com teclado ou leitor de tela, sem arrastar nada).
+- **Trocar cor / tirar:** clique no fio → barrinha com as cores e ✕ (com Desfazer).
+- **Seguir o fio:** passe o mouse num post-it — os fios dele acendem, os outros apagam, e os ligados ganham
+  destaque.
+- **Notas relacionadas:** dentro do post-it aberto, a lista do que está ligado a ele, com **Ir até** (fecha e
+  leva a tela até lá) e **Desligar**.
+- **Organizar como mapa de ideias** (⋯ Mais): **nem grade, nem bagunça** — o post-it com mais ligações no
+  centro, os ligados ao redor (cada ramo na sua fatia), nada por cima de nada; os sem ligação ficam em fileiras
+  soltas ao lado. Depois é só arrastar para deixar do seu jeito.
+- **Toda arrumação automática tem Desfazer** (12 s) — mapa de ideias, por assunto ou em grade.
+- No **celular em grade** os fios não são desenhados (não cabem); cada post-it mostra **🔗 N** ligações.
+
 ## 📅 Lembretes, repetição e calendário
 
 - **Horário opcional** ("Reunião às 14:00") e **aviso antecipado**: 15/30 min, 1/2 h, 1 ou 2 dias ou
@@ -306,7 +327,8 @@ A chave fica **só no backend**, nunca vai para o navegador.
 | GET    | `/calendar?month=AAAA-MM` | Post-its com data em cada dia do mês      |
 | GET    | `/notes/tags`            | Etiquetas usadas (filtro da busca)         |
 | GET/POST | `/links?folder=` · `/links` | Setas entre post-its da pasta / ligar dois (`{ fromId, toId }`) |
-| DELETE | `/links/:id`             | Tirar uma seta                             |
+| PATCH/DELETE | `/links/:id`       | Trocar a cor do fio (`{ color }`) / tirar  |
+| POST   | `/notes/positions`       | Gravar várias posições (mapa de ideias / Desfazer) |
 | POST   | `/notes/arrange` `{ mode: 'subject' }` | Organizar por assunto (1ª etiqueta) |
 | GET    | `/alerts`                | Alertas de hoje + próximos 7 dias          |
 | POST   | `/alerts/:id/dismiss`    | Fecha o alerta (não aparece mais hoje)     |

@@ -1,0 +1,316 @@
+/* =====================================================================
+   Mural infinito: mover o mural, setas entre post-its, assuntos e minimapa
+   ===================================================================== */
+
+/* fundo do mural livre: a mãozinha mostra que dá para arrastar (affordance) */
+.canvas.free {
+  cursor: grab;
+}
+
+.board.is-panning,
+.board.is-panning .canvas.free,
+.board.is-panning .postit {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.board.space-pan .canvas.free,
+.board.space-pan .postit {
+  cursor: grab !important;
+}
+
+.canvas.is-linking,
+.canvas.is-linking .postit {
+  cursor: crosshair !important;
+}
+
+/* ---------- setas ---------- */
+.links-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.link-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+  transition: stroke 0.15s, stroke-width 0.15s;
+}
+
+.link-arrow-head {
+  fill: rgba(255, 255, 255, 0.75);
+}
+
+html.theme-light .link-line {
+  stroke: rgba(40, 30, 10, 0.5);
+}
+
+html.theme-light .link-arrow-head {
+  fill: rgba(40, 30, 10, 0.65);
+}
+
+.link.hover .link-line {
+  stroke: var(--accent);
+  stroke-width: 3.4px;
+}
+
+.link-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.link-remove {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.link-remove circle {
+  fill: #e03131;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.link-remove path {
+  stroke: #fff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.link-remove:focus-visible circle {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.link-preview {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4px;
+  stroke-dasharray: 7 6;
+  animation: link-dash 0.6s linear infinite;
+}
+
+@keyframes link-dash {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
+/* bolinha de conexão na borda direita do post-it (aparece ao passar o mouse) */
+.link-handle {
+  position: absolute;
+  top: 50%;
+  right: -9px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: crosshair;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.postit:hover .link-handle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.link-handle:hover {
+  transform: scale(1.25) !important;
+}
+
+@media (hover: none) {
+  .link-handle {
+    display: none;
+  }
+}
+
+/* post-it que pode receber a seta */
+.postit.link-target {
+  outline: 3px dashed var(--accent);
+  outline-offset: 4px;
+}
+
+.link-banner {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  z-index: 10003;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 999px;
+  background: rgba(22, 22, 30, 0.95);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 0.9rem;
+  box-shadow: var(--shadow-md);
+}
+
+html.theme-light .link-banner {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.link-banner button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+html.theme-light .link-banner button {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- zonas de assunto (#etiqueta) ---------- */
+.subject-zone {
+  position: absolute;
+  z-index: 0;
+  border-radius: 20px;
+  border: 2px dashed color-mix(in srgb, var(--zone) 70%, transparent);
+  background: color-mix(in srgb, var(--zone) 10%, transparent);
+  pointer-events: none;
+  transition: left 0.3s, top 0.3s, width 0.3s, height 0.3s;
+}
+
+.subject-zone-label {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--zone);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.subject-zone-label small {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  font-size: 0.75rem;
+}
+
+/* ---------- minimapa ---------- */
+.minimap {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 9999;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(22, 22, 30, 0.88);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
+}
+
+html.theme-light .minimap {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.minimap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.minimap-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.minimap-head button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.minimap-head button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.minimap-canvas {
+  display: block;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  touch-action: none;
+}
+
+html.theme-light .minimap-canvas {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.minimap-canvas rect {
+  opacity: 0.9;
+}
+
+.minimap-view {
+  fill: rgba(255, 216, 77, 0.12);
+  stroke: var(--accent);
+  stroke-width: 2;
+  opacity: 1 !important;
+}
+
+/* o minimapa sobe quando o timer de foco está aberto embaixo */
+.board-tools:has(.focus-timer) ~ .minimap,
+.minimap:has(~ .board-tools .focus-timer) {
+  bottom: 100px;
+}
+
+@media (max-width: 720px) {
+  .minimap {
+    display: none;
+  }
+}
+
+/* ---------- barra de baixo: ajustar à tela e opções ligadas no menu ---------- */
+.zoom-control .zoom-fit {
+  border-left: 1px solid var(--glass-border) !important;
+}
+
+.tools-menu-list > button.on .tm-icon {
+  color: var(--accent);
+}
+
+.tools-menu-list > button.on .tm-text::after {
+  content: ' ✓';
+  color: var(--accent);
+  font-weight: 700;
+}

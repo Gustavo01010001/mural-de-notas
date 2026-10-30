@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController.js';
 import { NoteController } from '../controllers/noteController.js';
+import { LinkController } from '../controllers/linkController.js';
 import { AlertController } from '../controllers/alertController.js';
 import { WeatherController } from '../controllers/weatherController.js';
 import { SettingsController } from '../controllers/settingsController.js';
@@ -45,6 +46,11 @@ router.get('/live/folders/:id', requireAuth, LiveController.stream);
 router.post('/live/folders/:id/cursor', requireAuth, LiveController.cursor);
 
 // Post-its — rotas fixas antes das que têm :id
+// Conexões entre post-its (mural infinito)
+router.get('/links', requireAuth, LinkController.list);
+router.post('/links', requireAuth, LinkController.create);
+router.delete('/links/:id', requireAuth, LinkController.remove);
+
 router.get('/notes', requireAuth, NoteController.list);
 router.get('/notes/search', requireAuth, NoteController.search);
 router.get('/notes/tags', requireAuth, NoteController.tags);

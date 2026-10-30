@@ -143,6 +143,18 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_code ON users(public_code) WHERE public_code IS NOT NULL;
 
+  -- Conexões (setas) entre post-its da mesma pasta — mural infinito
+  CREATE TABLE IF NOT EXISTS note_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    from_id    INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    to_id      INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (from_id, to_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_links_owner ON note_links(owner_id);
+
   -- Alertas fechados por convidados de pastas compartilhadas (o da dona fica no próprio post-it)
   CREATE TABLE IF NOT EXISTS alert_dismissals (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

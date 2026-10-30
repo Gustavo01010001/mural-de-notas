@@ -112,6 +112,10 @@ em BLOB), `folders` (dono, nome, ícone, cor, pai, posição), `folder_members`,
 | Aparência também em `localStorage` (`mural_look`) | evita "piscar" o tema escuro antes de carregar |
 | ID público `users.public_code` (XXXX-XXXX, aleatório) | convidar sem e-mail; não expõe o id interno nem quantas contas existem |
 | Lista de participantes sem e-mail (só nome + ID) | quem convidou pelo ID não deve descobrir o e-mail do outro |
+| Mural infinito = rolagem nativa + `scale()` (lib/useInfiniteBoard.js) | leve; durante o gesto o zoom vai direto no DOM e só no fim vira estado do React |
+| Espaço livre medido em telas (`calc(… + 100vw/100vh)`) | sobra espaço para mover em qualquer zoom (em pixels do mural ele encolhia no zoom baixo) |
+| Setas em tabela própria `note_links` (ON DELETE CASCADE) | some sozinha ao apagar o post-it; na lixeira só fica escondida |
+| "Organizar por assunto" no back (`arrangeBySubject`) | etiqueta de 1 post-it vai para "outros" — evita dezenas de blocos de 1 |
 
 ## 6. Como rodar e testar
 

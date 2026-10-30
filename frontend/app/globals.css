@@ -2290,7 +2290,7 @@ button.upcoming-item:hover {
   top: 76px; /* = BOARD_TOP em page.js: começa abaixo da barra do topo */
   left: 0;
   transform-origin: 0 0;
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* sem transição: o zoom suave é feito quadro a quadro em lib/useInfiniteBoard.js */
 }
 
 .canvas-inner-grid {

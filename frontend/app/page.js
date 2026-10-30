@@ -21,7 +21,9 @@ import CalendarPanel from '@/components/CalendarPanel';
 import { FolderDropDock, LiveCursors, PresenceBar } from '@/components/LiveLayer';
 import { useLiveFolder } from '@/lib/useLiveFolder';
 import { flattenTree } from '@/lib/folderTree';
-import { BoardTools, SelectionBar, ZOOM_MAX, ZOOM_MIN } from '@/components/BoardTools';
+import { BoardTools, SelectionBar } from '@/components/BoardTools';
+import { boardStyles, useInfiniteBoard, ZOOM_MAX, ZOOM_MIN } from '@/lib/useInfiniteBoard';
+import { LinksLayer, Minimap, noteRect, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
 import { useWeather } from '@/lib/useWeather';
 import { applyAppearance } from '@/lib/appearance';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
@@ -31,6 +33,8 @@ import { resolveScene } from '@/lib/scenes';
 
 // O mural livre começa abaixo da barra do topo (senão os post-its de cima ficam escondidos atrás dela)
 const BOARD_TOP = 76;
+const MINIMAP_KEY = 'mural_minimap';
+const SUBJECTS_KEY = 'mural_subjects';
 
 const ALERT_POLL_MS = 60 * 1000;
 
@@ -170,6 +174,16 @@ export default function BoardPage() {
   const [selection, setSelection] = useState(null); // null = fora do modo seleção; Set de ids
   const [zoom, setZoomState] = useState(1);
   const [arranging, setArranging] = useState(false);
+  // Mural infinito: setas entre post-its, "ligando" (escolhendo o destino), arraste ao vivo, minimapa e assuntos
+  const [links, setLinks] = useState([]);
+  const [linking, setLinking] = useState(null); // { from, to: {x,y} | null, drag }
+  const [liveDrag, setLiveDrag] = useState(null); // { id, x, y }
+  const [showMinimap, setShowMinimap] = useState(true);
+  const [showSubjects, setShowSubjects] = useState(false);
+  const canvasRef = useRef(null);
+  const layerRef = useRef(null);
+  const dragFrame = useRef(null);
+  const fitRef = useRef(() => {});
   const lastUndo = useRef(null); // para o Ctrl+Z
 
   useEffect(() => {
@@ -179,8 +193,20 @@ export default function BoardPage() {
     } catch {}
   }, []);
 
+  useEffect(() => {
+    try {
+      setShowMinimap(localStorage.getItem(MINIMAP_KEY) !== '0');
+      setShowSubjects(localStorage.getItem(SUBJECTS_KEY) === '1');
+    } catch {}
+  }, []);
+  const savePref = (key, value) => {
+    try {
+      localStorage.setItem(key, value ? '1' : '0');
+    } catch {}
+  };
+
   const setZoom = useCallback((z) => {
-    const value = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
+    const value = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 1000) / 1000;
     setZoomState(value);
     try {
       localStorage.setItem(ZOOM_KEY, String(value));
@@ -198,9 +224,13 @@ export default function BoardPage() {
   // Busca no back só os post-its da pasta aberta
   const loadNotes = useCallback(async (folder) => {
     const id = ++notesReq.current;
-    const data = await api(`/notes?folder=${folder ?? 'root'}`);
+    const [data, linkData] = await Promise.all([
+      api(`/notes?folder=${folder ?? 'root'}`),
+      api(`/links?folder=${folder ?? 'root'}`).catch(() => ({ links: [] })),
+    ]);
     if (id === notesReq.current) {
       setNotes(data.notes);
+      setLinks(linkData.links ?? []);
       setNotesLoaded(true);
     }
   }, []);
@@ -743,15 +773,25 @@ export default function BoardPage() {
   }
 
   // ----- arrumar mural -----
-  async function handleArrange() {
+  async function handleArrange(mode) {
     const usable = (window.innerWidth / zoom) - 80;
     const widest = Math.max(230, ...notes.map((n) => n.width ?? 230)) + 30;
-    const columns = Math.max(1, Math.min(8, Math.floor(usable / widest)));
+    // por assunto: largura pensada para tudo caber no formato da tela (mais largo que alto)
+    const aspect = window.innerWidth / Math.max(1, window.innerHeight - 160);
+    const columns =
+      mode === 'subject'
+        ? Math.max(4, Math.min(16, Math.round(Math.sqrt(notes.length * aspect * 1.3))))
+        : Math.max(1, Math.min(8, Math.floor(usable / widest)));
     setArranging(true);
     try {
-      const data = await api('/notes/arrange', { method: 'POST', body: { folderId: currentFolder, columns } });
+      const data = await api('/notes/arrange', { method: 'POST', body: { folderId: currentFolder, columns, mode } });
       setNotes(data.notes);
-      boardRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+      if (mode === 'subject') {
+        // mostra o contorno de cada assunto e enquadra tudo na tela
+        setShowSubjects(true);
+        savePref(SUBJECTS_KEY, true);
+        setTimeout(() => fitRef.current(), 650);
+      } else boardRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
       toast(data.message, 'success');
     } catch (err) {
       handleAuthError(err);
@@ -767,25 +807,6 @@ export default function BoardPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selection]);
-
-  // Ctrl + rodinha do mouse = zoom (só no mural livre)
-  useEffect(() => {
-    const el = boardRef.current;
-    if (!el) return;
-    const onWheel = (e) => {
-      if (!(e.ctrlKey || e.metaKey) || window.innerWidth <= 720) return;
-      e.preventDefault();
-      setZoomState((z) => {
-        const value = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - Math.sign(e.deltaY) * 0.1)) * 10) / 10;
-        try {
-          localStorage.setItem(ZOOM_KEY, String(value));
-        } catch {}
-        return value;
-      });
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, []);
 
   async function handleMove(id, pos) {
     try {
@@ -894,19 +915,128 @@ export default function BoardPage() {
   // filtro por etiqueta (clicando numa #etiqueta do post-it)
   const visibleNotes = tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes;
   const shownNotes = gridMode ? [...visibleNotes].sort(readingOrder) : visibleNotes;
-  const canvasW = Math.max(0, ...notes.map((n) => n.x + (n.width ?? 230) + 90));
-  const canvasH = Math.max(0, ...notes.map((n) => n.y + (n.height ?? 300) + 90));
+  // até onde vão os post-its (o espaço livre extra é somado em boardStyles)
+  const canvasW = Math.max(0, ...notes.map((n) => n.x + (n.width ?? 230)));
+  const canvasH = Math.max(0, ...notes.map((n) => n.y + (n.height ?? 300)));
   // O mural "de fora" tem o tamanho já com zoom (para a rolagem funcionar);
   // por dentro os post-its continuam nas coordenadas reais e o conjunto é escalado
-  const canvasStyle = gridMode ? undefined : { width: `max(100%, ${canvasW * z}px)`, height: `max(100%, ${canvasH * z + BOARD_TOP}px)` };
-  const zoomStyle = gridMode
-    ? undefined
-    : {
-        width: `max(${100 / z}%, ${canvasW}px)`,
-        height: `max(${100 / z}%, ${canvasH}px)`,
-        transform: z === 1 ? undefined : `scale(${z})`,
-      };
+  // (mesmo cálculo que o motor do mural usa durante o zoom: sempre sobra uma tela livre para mover)
+  const freeStyles = gridMode ? null : boardStyles(canvasW, canvasH, z, BOARD_TOP);
+  const canvasStyle = freeStyles?.canvas;
+  const zoomStyle = freeStyles?.layer;
   const selecting = selection !== null;
+
+  const boardApi = useInfiniteBoard({
+    boardRef,
+    canvasRef,
+    layerRef,
+    enabled: Boolean(user) && !gridMode,
+    zoom,
+    onZoomCommit: setZoom,
+    contentSize: { w: canvasW, h: canvasH },
+    boardTop: BOARD_TOP,
+  });
+  const sizes = useNoteSizes(notes, layerRef);
+
+  // "Ajustar à tela": enquadra todos os post-its visíveis
+  fitRef.current = () => {
+    if (!visibleNotes.length || gridMode) return;
+    const rects = visibleNotes.map((n) => noteRect(n, sizes));
+    const x = Math.min(...rects.map((r) => r.x));
+    const y = Math.min(...rects.map((r) => r.y)) - 50; // espaço para os rótulos de assunto
+    const w = Math.max(...rects.map((r) => r.x + r.w)) - x;
+    const h = Math.max(...rects.map((r) => r.y + r.h)) - y;
+    boardApi.fitBox({ x, y, w, h });
+  };
+  const fitAll = () => fitRef.current();
+
+  // posição ao vivo do post-it sendo arrastado (no máximo 1 atualização por quadro)
+  const handleDragMove = useCallback((id, p) => {
+    cancelAnimationFrame(dragFrame.current);
+    if (!p) return setLiveDrag(null);
+    dragFrame.current = requestAnimationFrame(() => setLiveDrag({ id, ...p }));
+  }, []);
+
+  // tela → coordenadas do mural
+  const toBoard = (cx, cy) => {
+    const el = boardRef.current;
+    const zz = boardApi.getZoom();
+    return { x: (cx + el.scrollLeft) / zz, y: (cy + el.scrollTop - BOARD_TOP) / zz };
+  };
+
+  async function createLink(fromId, toId) {
+    if (!fromId || !toId || fromId === toId) return;
+    try {
+      const data = await api('/links', { method: 'POST', body: { fromId, toId } });
+      setLinks((list) => [...list, data.link]);
+      playSound('pop');
+      toast(data.message, 'success');
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  async function removeLink(id) {
+    const link = links.find((l) => l.id === id);
+    try {
+      await api(`/links/${id}`, { method: 'DELETE' });
+      setLinks((list) => list.filter((l) => l.id !== id));
+      playSound('delete');
+      if (link) offerUndo('Conexão removida.', () => createLink(link.fromId, link.toId), 'info');
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }
+
+  // começar uma seta: arrastando a bolinha do post-it (e) ou pelo menu ⋯ (sem e: depois clica no destino)
+  const startLink = (note, e) => {
+    if (e) setLinking({ from: note.id, to: toBoard(e.clientX, e.clientY), drag: true });
+    else {
+      setLinking({ from: note.id, to: null, drag: false });
+      toast('Agora toque/clique no post-it que vai receber a seta (Esc cancela).', 'info');
+    }
+  };
+
+  const handleLinkTarget = (id) => {
+    if (!linking) return;
+    if (id !== linking.from) createLink(linking.from, id);
+    setLinking(null);
+  };
+
+  useEffect(() => {
+    if (!linking) return;
+    const onMove = (e) => setLinking((l) => (l ? { ...l, to: toBoard(e.clientX, e.clientY) } : l));
+    const onUp = (e) => {
+      if (!linking.drag) return;
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-note-id]');
+      const toId = target ? Number(target.dataset.noteId) : null;
+      setLinking(null);
+      if (toId && toId !== linking.from) createLink(linking.from, toId);
+    };
+    const onDown = (e) => {
+      if (!linking.drag && !e.target.closest('[data-note-id], .link-banner')) setLinking(null); // clicou fora: cancela
+    };
+    const onKey = (e) => e.key === 'Escape' && setLinking(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linking?.from, linking?.drag]);
+
+  // Shift + 1 (vem do motor do mural)
+  useEffect(() => {
+    const el = boardRef.current;
+    const onFit = () => fitRef.current();
+    el?.addEventListener('board-fit', onFit);
+    return () => el?.removeEventListener('board-fit', onFit);
+  }, []);
 
   const scene = resolveScene(settings, weather);
   const isDay = weather?.isDay ?? true;
@@ -1013,14 +1143,26 @@ export default function BoardPage() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={`${currentFolder}-${gridMode ? 'grid' : 'free'}`}
-          className={`canvas ${gridMode ? 'canvas-grid' : ''} ${settings.showWeather ? 'with-weather' : ''}`}
+          ref={canvasRef}
+          className={`canvas ${gridMode ? 'canvas-grid' : 'free'} ${settings.showWeather ? 'with-weather' : ''} ${linking ? 'is-linking' : ''}`}
           style={canvasStyle}
           initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -40 }}
           transition={{ duration: 0.25 }}
         >
-          <div className={gridMode ? 'canvas-inner-grid' : 'canvas-zoom'} style={zoomStyle}>
+          <div ref={layerRef} className={gridMode ? 'canvas-inner-grid' : 'canvas-zoom'} style={zoomStyle}>
+            {!gridMode && showSubjects && <SubjectZones notes={visibleNotes} sizes={sizes} drag={liveDrag} onPick={(t) => setTagFilter(t)} />}
+            {!gridMode && (
+              <LinksLayer
+                links={links}
+                notes={visibleNotes}
+                sizes={sizes}
+                drag={liveDrag}
+                preview={linking?.to ? { from: linking.from, to: linking.to } : null}
+                onRemove={removeLink}
+              />
+            )}
             <AnimatePresence>
               {shownNotes.map((note, i) => (
                 <PostIt
@@ -1047,6 +1189,10 @@ export default function BoardPage() {
                   onSelect={toggleSelect}
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
+                  onDragMove={gridMode ? undefined : handleDragMove}
+                  linkMode={Boolean(linking) && !linking.drag}
+                  onLinkStart={gridMode ? undefined : startLink}
+                  onLinkTarget={handleLinkTarget}
                 />
               ))}
             </AnimatePresence>
@@ -1078,8 +1224,14 @@ export default function BoardPage() {
       {user && (
         <BoardTools
           zoom={zoom}
-          onZoom={setZoom}
-          onArrange={handleArrange}
+          onZoom={(v) => boardApi.zoomTo(v)}
+          onFit={fitAll}
+          onArrange={() => handleArrange()}
+          onArrangeSubject={() => handleArrange('subject')}
+          showSubjects={showSubjects}
+          onToggleSubjects={() => (setShowSubjects(!showSubjects), savePref(SUBJECTS_KEY, !showSubjects))}
+          showMinimap={showMinimap}
+          onToggleMinimap={() => (setShowMinimap(!showMinimap), savePref(MINIMAP_KEY, !showMinimap))}
           arranging={arranging}
           selecting={selecting}
           onSelectMode={() => setSelection((s) => (s === null ? new Set() : null))}
@@ -1100,6 +1252,34 @@ export default function BoardPage() {
           )}
         </BoardTools>
       )}
+
+      {/* minimapa (PC, mural livre) */}
+      <AnimatePresence>
+        {user && !gridMode && showMinimap && notes.length > 0 && (
+          <Minimap
+            key="minimap"
+            notes={visibleNotes}
+            sizes={sizes}
+            drag={liveDrag}
+            boardRef={boardRef}
+            board={boardApi}
+            boardTop={BOARD_TOP}
+            onClose={() => (setShowMinimap(false), savePref(MINIMAP_KEY, false))}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* escolhendo o destino de uma seta (pelo menu ⋯) */}
+      <AnimatePresence>
+        {linking && !linking.drag && (
+          <motion.div className="link-banner" role="status" initial={{ opacity: 0, y: -10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: -10, x: '-50%' }}>
+            <Icon name="link" size={15} /> Escolha o post-it que vai receber a seta
+            <button type="button" onClick={() => setLinking(null)}>
+              Cancelar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <SelectionBar
         count={selecting ? selection.size : null}

@@ -3,7 +3,7 @@ import { FolderModel } from '../models/folderModel.js';
 import { UserModel } from '../models/userModel.js';
 import { withCountdown } from '../services/alertService.js';
 import { listTags, searchNotes } from '../services/searchService.js';
-import { arrangeNotes } from '../services/arrangeService.js';
+import { arrangeBySubject, arrangeNotes } from '../services/arrangeService.js';
 import { folderAccess, noteAccess } from '../services/accessService.js';
 import { live } from '../services/liveService.js';
 import { HttpError } from '../utils/httpError.js';
@@ -253,13 +253,23 @@ export const NoteController = {
   // POST /notes/arrange { folderId, columns } — organiza a pasta em grade
   arrange(req, res) {
     const access = folderAccess(req.user.id, req.body?.folderId);
-    const columns = Math.min(Math.max(Number(req.body?.columns) || 4, 1), 8);
+    // por assunto pode usar mais colunas (os blocos ficam lado a lado no formato da tela)
+    const columns = Math.min(Math.max(Number(req.body?.columns) || 4, 1), req.body?.mode === 'subject' ? 16 : 8);
     const notes = NoteModel.listByFolder(access.ownerId, access.folderId);
-    NoteModel.setPositions(access.ownerId, arrangeNotes(notes, columns));
+    // mode "subject": junta por assunto (primeira etiqueta); senão, grade simples
+    const bySubject = req.body?.mode === 'subject';
+    const plan = bySubject ? arrangeBySubject(notes, columns) : { positions: arrangeNotes(notes, columns), groups: [] };
+    NoteModel.setPositions(access.ownerId, plan.positions);
     live.notify(access.folderId, req.user.id);
     const today = todayIn(req.query.tz);
+    const subjects = plan.groups.filter((g) => g.subject).length;
     res.json({
-      message: 'Mural arrumado! ✨',
+      message: bySubject
+        ? subjects
+          ? `Organizado em ${subjects} assunto${subjects === 1 ? '' : 's'} pelas etiquetas! 🗂️`
+          : 'Nenhum post-it tem etiqueta ainda: arrumei em grade. Dica: use #etiquetas para agrupar por assunto.'
+        : 'Mural arrumado! ✨',
+      groups: plan.groups,
       notes: NoteModel.listByFolder(access.ownerId, access.folderId).map((n) => withCountdown(n, today)),
     });
   },

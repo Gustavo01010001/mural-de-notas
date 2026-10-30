@@ -587,10 +587,10 @@ describe('Ações em lote e arrumar mural', () => {
     await call(`/notes/${created[0].id}/pin`, { method: 'POST', token, body: { pinned: true } });
     const r = await call('/notes/arrange', { method: 'POST', token, body: { folderId: f.id, columns: 2 } });
     const byTitle = Object.fromEntries(r.data.notes.map((n) => [n.title, n]));
-    assert.deepEqual([byTitle.c.x, byTitle.c.y], [40, 120]); // fixado vai para o 1º lugar
-    assert.equal(byTitle.a.y, 120); // mesma linha
+    assert.deepEqual([byTitle.c.x, byTitle.c.y], [40, 40]); // fixado vai para o 1º lugar (o mural já começa abaixo da barra do topo)
+    assert.equal(byTitle.a.y, 40); // mesma linha
     assert.ok(byTitle.a.x > byTitle.c.x);
-    assert.ok(byTitle.b.y > 120); // segunda linha
+    assert.ok(byTitle.b.y > 40); // segunda linha
   });
 
   test('outro usuário não consegue usar lote nos meus post-its', async () => {
@@ -1246,5 +1246,106 @@ describe('Trabalho em grupo: edição ao mesmo tempo, lembretes, lixeira e backu
     const copy = (await call('/folders', { token: outro.token })).data.folders.find((f) => f.name.includes('(cópia do grupo)'));
     assert.ok(copy);
     assert.ok((await call(`/notes?folder=${copy.id}`, { token: outro.token })).data.notes.some((n) => n.title.startsWith('Roteiro')));
+  });
+});
+
+describe('Mural infinito: conexões entre post-its e organizar por assunto', () => {
+  let dona, colega, estranho, folder, outra, a, b, c;
+  const mk = (token, body) => call('/notes', { method: 'POST', token, body }).then((r) => r.data.note);
+
+  before(async () => {
+    dona = await newUser('Kátia');
+    colega = await newUser('Leo');
+    estranho = await newUser('Mário');
+    folder = (await call('/folders', { method: 'POST', token: dona.token, body: { name: 'Mapa mental', icon: '🧠' } })).data.folder;
+    outra = (await call('/folders', { method: 'POST', token: dona.token, body: { name: 'Outra pasta' } })).data.folder;
+    await call(`/folders/${folder.id}/members`, { method: 'POST', token: dona.token, body: { who: colega.user.code } });
+    a = await mk(dona.token, { title: 'Problema', folderId: folder.id, tags: ['ideia'] });
+    b = await mk(dona.token, { title: 'Causa', folderId: folder.id, tags: ['ideia'] });
+    c = await mk(dona.token, { title: 'Solução', folderId: folder.id, tags: ['plano'] });
+  });
+
+  test('ligar dois post-its: aparece para a dona e para o grupo', async () => {
+    const r = await call('/links', { method: 'POST', token: dona.token, body: { fromId: a.id, toId: b.id } });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    assert.equal(r.data.link.fromId, a.id);
+    // o convidado também liga, e vê as duas
+    assert.equal((await call('/links', { method: 'POST', token: colega.token, body: { fromId: b.id, toId: c.id } })).status, 201);
+    const seen = (await call(`/links?folder=${folder.id}`, { token: colega.token })).data.links;
+    assert.equal(seen.length, 2);
+    // quem não é do grupo não vê nem liga
+    assert.equal((await call(`/links?folder=${folder.id}`, { token: estranho.token })).status, 404);
+    assert.equal((await call('/links', { method: 'POST', token: estranho.token, body: { fromId: a.id, toId: c.id } })).status, 404);
+  });
+
+  test('ligação repetida (inclusive ao contrário), consigo mesmo ou entre pastas é recusada', async () => {
+    assert.equal((await call('/links', { method: 'POST', token: dona.token, body: { fromId: a.id, toId: b.id } })).status, 409);
+    assert.equal((await call('/links', { method: 'POST', token: dona.token, body: { fromId: b.id, toId: a.id } })).status, 409);
+    assert.equal((await call('/links', { method: 'POST', token: dona.token, body: { fromId: a.id, toId: a.id } })).status, 400);
+    const longe = await mk(dona.token, { title: 'Em outra pasta', folderId: outra.id });
+    const r = await call('/links', { method: 'POST', token: dona.token, body: { fromId: a.id, toId: longe.id } });
+    assert.equal(r.status, 400);
+    assert.match(r.data.error, /mesma pasta/);
+  });
+
+  test('post-it na lixeira esconde a seta; restaurar traz de volta; apagar de vez remove', async () => {
+    await call(`/notes/${c.id}`, { method: 'DELETE', token: dona.token });
+    let links = (await call(`/links?folder=${folder.id}`, { token: dona.token })).data.links;
+    assert.equal(links.length, 1, 'a seta para o post-it excluído some');
+    await call(`/notes/${c.id}/restore`, { method: 'POST', token: dona.token });
+    links = (await call(`/links?folder=${folder.id}`, { token: dona.token })).data.links;
+    assert.equal(links.length, 2, 'volta junto com o post-it');
+    await call(`/notes/${c.id}`, { method: 'DELETE', token: dona.token });
+    await call(`/notes/${c.id}/permanent`, { method: 'DELETE', token: dona.token });
+    c = await mk(dona.token, { title: 'Solução', folderId: folder.id, tags: ['plano'] });
+    links = (await call(`/links?folder=${folder.id}`, { token: dona.token })).data.links;
+    assert.equal(links.length, 1, 'apagado de vez leva a seta junto');
+  });
+
+  test('remover uma conexão (dona ou grupo); estranho não remove', async () => {
+    const r = await call('/links', { method: 'POST', token: dona.token, body: { fromId: b.id, toId: c.id } });
+    assert.equal((await call(`/links/${r.data.link.id}`, { method: 'DELETE', token: estranho.token })).status, 404);
+    assert.equal((await call(`/links/${r.data.link.id}`, { method: 'DELETE', token: colega.token })).status, 200);
+    assert.equal((await call(`/links/${r.data.link.id}`, { method: 'DELETE', token: dona.token })).status, 404);
+  });
+
+  test('organizar por assunto junta pela primeira etiqueta e devolve os grupos', async () => {
+    await mk(dona.token, { title: 'Ideia 3', folderId: folder.id, tags: ['ideia'] });
+    await mk(dona.token, { title: 'Sem assunto', folderId: folder.id });
+    const r = await call('/notes/arrange', { method: 'POST', token: colega.token, body: { folderId: folder.id, columns: 4, mode: 'subject' } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.match(r.data.message, /1 assunto/);
+    const subjects = r.data.groups.map((g) => g.subject);
+    // #plano tem um post-it só: não vira bloco, vai para "outros" junto com o sem etiqueta
+    assert.deepEqual(subjects, ['ideia', null], 'assunto com 2+ post-its vira bloco; o resto fica em "outros" no fim');
+    assert.equal(r.data.groups[1].count, 2);
+    const ideia = r.data.groups[0];
+    const pos = Object.fromEntries(r.data.notes.map((n) => [n.title, n]));
+    // os 3 de #ideia ficam dentro do bloco do grupo
+    for (const t of ['Problema', 'Causa', 'Ideia 3']) {
+      assert.ok(pos[t].x >= ideia.x && pos[t].x < ideia.x + ideia.width, `${t} dentro do bloco (x)`);
+      assert.ok(pos[t].y >= ideia.y && pos[t].y < ideia.y + ideia.height, `${t} dentro do bloco (y)`);
+    }
+    // blocos não se sobrepõem
+    const [g1, g2] = r.data.groups;
+    const overlap = g1.x < g2.x + g2.width && g2.x < g1.x + g1.width && g1.y < g2.y + g2.height && g2.y < g1.y + g1.height;
+    assert.ok(!overlap);
+  });
+
+  test('mural maior: posição até 50 mil px', async () => {
+    const r = await call(`/notes/${a.id}/position`, { method: 'PATCH', token: dona.token, body: { x: 30000, y: 45000 } });
+    assert.equal(r.data.note.x, 30000);
+    assert.equal(r.data.note.y, 45000);
+  });
+
+  test('backup leva as setas e importar refaz as ligações', async () => {
+    const backup = (await call('/account/export', { token: dona.token })).data;
+    assert.ok(backup.links.length >= 1);
+    const outroUser = await newUser('Nina');
+    const imp = await call('/account/import', { method: 'POST', token: outroUser.token, body: { backup } });
+    assert.equal(imp.status, 200, JSON.stringify(imp.data));
+    assert.equal(imp.data.links, backup.links.length);
+    const f = (await call('/folders', { token: outroUser.token })).data.folders.find((x) => x.name === 'Mapa mental');
+    assert.equal((await call(`/links?folder=${f.id}`, { token: outroUser.token })).data.links.length, backup.links.length);
   });
 });

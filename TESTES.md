@@ -178,3 +178,27 @@ João Colega!", a lista mostra nome + ID e nenhum e-mail; o João passa a ver a 
 
 5 estudantes ao mesmo tempo numa pasta compartilhada (script + 3 contas logadas no navegador): **20 OK · 0 falhas · 5 achados**.
 Detalhes, achados e como repetir em [TESTE_GRUPO.md](TESTE_GRUPO.md).
+
+# ✅ Rodada 7 — Mural infinito (30/10/2026)
+
+**Automáticos:** `npm test` → **78/78** (novos: ligar post-its e ver no grupo; ligação repetida/ao contrário,
+consigo mesmo ou entre pastas recusada; lixeira esconde/restaurar devolve/apagar de vez remove a seta;
+remover seta (dona e grupo, estranho não); organizar por assunto devolve blocos que não se sobrepõem;
+posição até 50 mil px; backup leva as setas e importar refaz).
+
+**Navegador (PC 1366×768, pasta do TCC com 51 post-its):**
+- Ajustar à tela: os 51 visíveis e inteiros; zoom com Ctrl+roda mirando o cursor — o post-it sob o cursor
+  ficou parado (606,326 → 607,325) indo de 36% a 200%.
+- Arrastar o fundo move o mural e a **inércia** continua o movimento ao soltar (116,162 → 187,190).
+- Seta criada arrastando a bolinha ("Tema do TCC → Resultados"); prévia tracejada durante o arraste;
+  remover pela ✕ e **Desfazer** traz de volta.
+- Organizar por assunto: 6 assuntos com contorno e nome + bloco "outros"; tema claro legível.
+- Celular (375×812): sem erros; minimapa escondido; pinça disponível no modo livre.
+
+**Encontrado e corrigido durante o teste:** laço de atualização infinito (o minimapa redesenhava sem
+parar — o motor do mural devolvia um objeto novo a cada renderização); sem espaço para mover no zoom baixo;
+"organizar por assunto" com 18 blocos de 1 post-it; "ajustar" escondia o topo quando não cabia; clicar na
+seta escondia o ✕.
+
+**Não testado com mouse real:** arrastar um post-it até a borda (rolagem automática) e a seta acompanhando
+durante o arraste — testados pelo código e por eventos simulados, não com a mão no mouse.

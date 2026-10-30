@@ -4,6 +4,7 @@ import { db } from '../config/db.js';
 import { ACCOUNT_GRACE_DAYS, UserModel } from '../models/userModel.js';
 import { FolderModel, MAX_DEPTH } from '../models/folderModel.js';
 import { NoteModel } from '../models/noteModel.js';
+import { LinkModel } from '../models/linkModel.js';
 import { SettingsModel } from '../models/settingsModel.js';
 import { clearSessionCookie } from '../middlewares/auth.js';
 import { HttpError } from '../utils/httpError.js';
@@ -67,6 +68,8 @@ export const AccountController = {
       settings: SettingsModel.get(userId),
       folders,
       notes,
+      // setas entre post-its (só as minhas; as do grupo são da dona da pasta)
+      links: LinkModel.listByOwner(userId).map((l) => ({ from: l.fromId, to: l.toId })),
     };
     const day = new Date().toISOString().slice(0, 10);
     res.set('Content-Disposition', `attachment; filename="mural-de-notas-backup-${day}.json"`);
@@ -107,6 +110,7 @@ export const AccountController = {
 
     let imported = 0;
     let skipped = 0;
+    const noteMap = new Map(); // id no arquivo → id novo (para refazer as setas)
     for (const raw of backup.notes) {
       if (raw.status === 'trash') {
         skipped++;
@@ -132,16 +136,29 @@ export const AccountController = {
             // foto estragada: importa o post-it sem ela
           }
         }
+        noteMap.set(raw.id, note.id);
         imported++;
       } catch {
         skipped++;
       }
+    }
+
+    // setas entre post-its: só se os dois vieram e estão na mesma pasta
+    let links = 0;
+    for (const l of Array.isArray(backup.links) ? backup.links.slice(0, 2000) : []) {
+      const a = noteMap.get(l.from);
+      const b = noteMap.get(l.to);
+      if (!a || !b || a === b || LinkModel.findBetween(a, b)) continue;
+      if (NoteModel.findById(userId, a)?.folderId !== NoteModel.findById(userId, b)?.folderId) continue;
+      LinkModel.create(userId, a, b, userId);
+      links++;
     }
     res.json({
       message: `Backup importado: ${imported} post-it${imported === 1 ? '' : 's'} e ${idMap.size} pasta${idMap.size === 1 ? '' : 's'}.${skipped ? ` (${skipped} ignorado${skipped === 1 ? '' : 's'})` : ''}`,
       imported,
       folders: idMap.size,
       skipped,
+      links,
     });
   },
 

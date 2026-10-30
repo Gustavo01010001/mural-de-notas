@@ -147,6 +147,25 @@ Se não abrir no celular, libere o Node.js no Firewall do Windows para a rede qu
   as bolinhas de quem está na pasta agora e os post-its mudando na hora (sem recarregar).
   Funciona com Server-Sent Events (uma conexão aberta do servidor para o navegador), sem bibliotecas extras.
 
+## 🗺️ Mural infinito (como no Miro)
+
+No PC (e no celular em "Livre"), o mural é um espaço sem fim:
+
+| Quero… | Como |
+|---|---|
+| **Mover o mural** | Arraste o fundo com o mouse (solta e ele desliza um pouco e freia) · botão do meio · **Espaço** + arrastar · dois dedos no touchpad · um dedo no celular |
+| **Aproximar / afastar** | **Ctrl + roda do mouse** ou **pinça** no touchpad/celular — o zoom mira onde está o cursor · botões − / + · teclas **+** e **−** · **0** volta a 100% (25% a 200%) |
+| **Ver tudo** | Botão ⛶ **Ajustar à tela** ou **Shift + 1** |
+| **Ir para outra parte** | **Minimapa** (canto inferior direito): clique ou arraste o retângulo amarelo. Esconde/mostra no menu ⋯ Mais |
+| **Levar um post-it longe** | Arraste até a borda da tela: o mural rola sozinho enquanto você segura |
+| **Ligar dois post-its** | Passe o mouse no post-it e arraste a **bolinha** da borda direita até o outro (no toque: ⋯ → *Ligar a outro post-it* e toque no destino). A seta acompanha quando você move os post-its |
+| **Tirar uma seta** | Clique nela → ✕ (com **Desfazer**) |
+| **Agrupar por assunto** | ⋯ Mais → **Organizar por assunto**: junta os post-its pela 1ª **#etiqueta** (assunto com 2+ post-its vira um bloco; os avulsos ficam em "outros") e contorna cada assunto com o nome dele. *Mostrar assuntos* liga/desliga os contornos; clicar no nome filtra o assunto |
+
+Setas também valem nas **pastas compartilhadas** (o grupo vê na hora), vão no **backup** e somem/voltam junto
+com o post-it na lixeira. Por desempenho, o zoom e o movimento são aplicados direto na tela durante o gesto e
+só depois gravados (nada de redesenhar todos os post-its a cada movimento).
+
 ## 📅 Lembretes, repetição e calendário
 
 - **Horário opcional** ("Reunião às 14:00") e **aviso antecipado**: 15/30 min, 1/2 h, 1 ou 2 dias ou
@@ -286,6 +305,9 @@ A chave fica **só no backend**, nunca vai para o navegador.
 | POST   | `/live/folders/:id/cursor` | Posição do meu cursor                    |
 | GET    | `/calendar?month=AAAA-MM` | Post-its com data em cada dia do mês      |
 | GET    | `/notes/tags`            | Etiquetas usadas (filtro da busca)         |
+| GET/POST | `/links?folder=` · `/links` | Setas entre post-its da pasta / ligar dois (`{ fromId, toId }`) |
+| DELETE | `/links/:id`             | Tirar uma seta                             |
+| POST   | `/notes/arrange` `{ mode: 'subject' }` | Organizar por assunto (1ª etiqueta) |
 | GET    | `/alerts`                | Alertas de hoje + próximos 7 dias          |
 | POST   | `/alerts/:id/dismiss`    | Fecha o alerta (não aparece mais hoje)     |
 | GET    | `/settings`              | Configurações do usuário                   |

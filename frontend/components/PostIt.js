@@ -8,7 +8,11 @@ import { noteImageUrl } from '@/lib/api';
 import Icon from './Icon';
 
 // Elementos dentro do post-it que não devem começar um arrasto
-const INTERACTIVE = 'button, input, a, label, .resize-handle, .postit-menu';
+const INTERACTIVE = 'button, input, a, label, .resize-handle, .postit-menu, .link-handle';
+
+// Arrastar perto da borda da tela faz o mural rolar sozinho (sensação de espaço infinito)
+const EDGE = 56;
+const EDGE_SPEED = 18;
 
 function NoteImage({ note }) {
   const [src, setSrc] = useState(null);
@@ -62,6 +66,10 @@ export default function PostIt({
   onSelect,
   onDragStart,
   onDrop,
+  onDragMove, // posição "ao vivo" durante o arraste (para as setas acompanharem)
+  linkMode = false, // escolhendo o post-it de destino de uma seta
+  onLinkStart, // começar uma seta a partir deste post-it (arrastando a bolinha ou pelo menu)
+  onLinkTarget, // este post-it foi escolhido como destino
 }) {
   const [pos, setPos] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ width: note.width, height: note.height });
@@ -88,43 +96,73 @@ export default function PostIt({
   }, [menuOpen]);
 
   // ----- arrastar -----
+  // posição no mural = onde começou + quanto o mouse andou + quanto o mural rolou (com zoom, 1px na tela não é 1px no mural)
+  const dragPos = (d) => ({
+    x: Math.max(0, d.ox + (d.cx - d.sx + d.board.scrollLeft - d.sl) / zoom),
+    y: Math.max(0, d.oy + (d.cy - d.sy + d.board.scrollTop - d.st) / zoom),
+  });
+
   function handleDown(e) {
     if (e.button !== 0 || e.target.closest(INTERACTIVE)) return;
-    if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) return; // clique vira seleção
+    if (linkMode || selecting || e.shiftKey || e.ctrlKey || e.metaKey) return; // clique vira seleção / destino da seta
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y, moved: false };
+    const board = e.currentTarget.closest('.board') ?? document.scrollingElement;
+    drag.current = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, ox: pos.x, oy: pos.y, moved: false, board, sl: board.scrollLeft, st: board.scrollTop };
     setDragging(true);
     onFocus(note.id);
+  }
+
+  function follow(d) {
+    const p = dragPos(d);
+    setPos(p);
+    onDragMove?.(note.id, p);
+  }
+
+  // rola o mural enquanto o post-it está perto da borda
+  function edgeScroll() {
+    const d = drag.current;
+    if (!d || !d.moved) return;
+    const r = d.board.getBoundingClientRect();
+    const push = (dist) => (dist < EDGE ? Math.ceil(((EDGE - dist) / EDGE) * EDGE_SPEED) : 0);
+    const vx = push(d.cx - r.left) ? -push(d.cx - r.left) : push(r.right - d.cx);
+    const vy = push(d.cy - r.top - 70) ? -push(d.cy - r.top - 70) : push(r.bottom - d.cy - 90);
+    if (vx || vy) {
+      d.board.scrollLeft += vx;
+      d.board.scrollTop += vy;
+      follow(d);
+    }
+    d.raf = requestAnimationFrame(edgeScroll);
   }
 
   function handleMove(e) {
     const d = drag.current;
     if (!d) return;
-    // com zoom, 1px na tela não é 1px no mural
-    const dx = (e.clientX - d.sx) / zoom;
-    const dy = (e.clientY - d.sy) / zoom;
-    if (!d.moved && Math.abs(dx) + Math.abs(dy) > 3) {
+    d.cx = e.clientX;
+    d.cy = e.clientY;
+    if (!d.moved && Math.abs(d.cx - d.sx) + Math.abs(d.cy - d.sy) > 3) {
       d.moved = true;
       onDragStart?.(note); // mostra a faixa de pastas para soltar
+      d.raf = requestAnimationFrame(edgeScroll);
     }
-    setPos({ x: Math.max(0, d.ox + dx), y: Math.max(0, d.oy + dy) });
+    if (d.moved) follow(d);
   }
 
   function handleUp(e) {
     const d = drag.current;
     drag.current = null;
+    if (d) cancelAnimationFrame(d.raf);
     justDragged.current = !!d?.moved;
     setDragging(false);
+    onDragMove?.(note.id, null);
     if (d?.moved && onDrop?.(note, e.clientX, e.clientY)) {
       // soltou em cima de uma pasta: o post-it vai para lá (não salva posição aqui)
       setPos({ x: d.ox, y: d.oy });
       return;
     }
     if (d?.moved) {
-      onMove(note.id, {
-        x: Math.max(0, d.ox + (e.clientX - d.sx) / zoom),
-        y: Math.max(0, d.oy + (e.clientY - d.sy) / zoom),
-      });
+      d.cx = e.clientX;
+      d.cy = e.clientY;
+      onMove(note.id, dragPos(d));
     }
   }
 
@@ -132,6 +170,7 @@ export default function PostIt({
     const wasDrag = justDragged.current;
     justDragged.current = false;
     if (e.target.closest(INTERACTIVE)) return;
+    if (linkMode) return onLinkTarget?.(note.id);
     if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) return onSelect(note.id);
     // no toque não existe duplo clique "natural": um toque no post-it já abre para editar
     if (!wasDrag && window.matchMedia('(hover: none)').matches) onEdit(note);
@@ -171,6 +210,7 @@ export default function PostIt({
     found && 'is-found',
     note.pinned && 'is-pinned',
     selected && 'is-selected',
+    linkMode && 'link-target',
     selecting && 'is-selecting',
   ]
     .filter(Boolean)
@@ -226,6 +266,22 @@ export default function PostIt({
     >
       {note.pinned ? <span className="postit-pin" title="Fixado no topo">📌</span> : <span className="postit-tape" />}
 
+      {/* bolinha de conexão: arraste até outro post-it para ligar os dois com uma seta */}
+      {!grid && !selecting && !linkMode && onLinkStart && (
+        <span
+          className="link-handle hover-only"
+          role="button"
+          aria-label="Ligar a outro post-it"
+          title="Arraste até outro post-it para ligar os dois"
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.stopPropagation();
+            e.preventDefault();
+            onLinkStart(note, e);
+          }}
+        />
+      )}
+
       {selecting && (
         <span className={`postit-selectbox ${selected ? 'on' : ''}`} aria-hidden>
           {selected ? '✓' : ''}
@@ -263,6 +319,7 @@ export default function PostIt({
                     // no toque não há "passar o mouse": editar e fixar moram aqui
                     ['edit', 'Editar', () => onEdit(note), 'touch-only'],
                     ['pin', note.pinned ? 'Desafixar' : 'Fixar no topo', () => onPin(note), 'touch-only'],
+                    ...(!grid && onLinkStart ? [['link', 'Ligar a outro post-it', () => onLinkStart(note, null)]] : []),
                     ['copy', 'Duplicar', () => onDuplicate(note)],
                     ['folder', 'Mover para pasta…', () => onSelect(note.id)],
                     ...(note.eventDate

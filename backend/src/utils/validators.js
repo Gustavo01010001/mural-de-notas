@@ -151,8 +151,9 @@ export function validatePosition(body = {}) {
   const y = Number(body.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) throw new HttpError(400, 'Posição inválida.');
   return {
-    x: Math.max(0, Math.min(x, 20000)),
-    y: Math.max(0, Math.min(y, 20000)),
+    // mural infinito: espaço de sobra para a direita e para baixo
+    x: Math.max(0, Math.min(x, 50000)),
+    y: Math.max(0, Math.min(y, 50000)),
     bringToFront: Boolean(body.bringToFront),
   };
 }

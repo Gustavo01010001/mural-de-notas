@@ -71,6 +71,7 @@ export default function PostIt({
   onLinkStart, // começar uma seta a partir deste post-it (arrastando a bolinha ou pelo menu)
   onLinkTarget, // este post-it foi escolhido como destino
   linkCount = 0, // quantos fios saem dele (indicador na grade do celular)
+  quiet = false, // pasta com muitos post-its: aparece direto, sem animação de entrada (desempenho)
 }) {
   const [pos, setPos] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ width: note.width, height: note.height });
@@ -221,7 +222,7 @@ export default function PostIt({
     ? {
         layout: true, // quando um post-it some/entra, os outros deslizam para o lugar
         style: { '--float-delay': floatDelay },
-        initial: { opacity: 0, y: 40, scale: 0.85, rotate: note.rotation * 0.4 - 8 },
+        initial: quiet ? false : { opacity: 0, y: 40, scale: 0.85, rotate: note.rotation * 0.4 - 8 },
         // entrada em "cascata": cada post-it chega um pouquinho depois do anterior
         animate: {
           opacity: 1,
@@ -245,7 +246,7 @@ export default function PostIt({
           zIndex: dragging ? 99999 : note.z + (note.pinned ? 50000 : 0),
           '--float-delay': floatDelay,
         },
-        initial: { opacity: 0, scale: 0.3, y: -140, rotate: note.rotation - 30 },
+        initial: quiet ? false : { opacity: 0, scale: 0.3, y: -140, rotate: note.rotation - 30 },
         animate: { opacity: 1, scale: dragging ? 1.08 : 1, y: 0, rotate: dragging ? 0 : note.rotation },
         exit: { opacity: 0, scale: 0.1, rotate: note.rotation + 200, filter: 'blur(4px)', transition: { duration: 0.45 } },
         whileHover: dragging || selecting ? undefined : { scale: 1.04, rotate: 0, y: -6 },

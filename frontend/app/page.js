@@ -34,6 +34,10 @@ import { resolveScene } from '@/lib/scenes';
 
 // O mural livre começa abaixo da barra do topo (senão os post-its de cima ficam escondidos atrás dela)
 const BOARD_TOP = 76;
+// Acima disso visível ao mesmo tempo, os post-its param de "respirar" (zoom afastado: o movimento nem aparece, só pesa)
+const MANY_VISIBLE = 40;
+// Pasta com muitos post-its: eles aparecem direto, sem a animação de "cair" um por um
+const QUIET_ENTRY = 40;
 const MINIMAP_KEY = 'mural_minimap';
 const SUBJECTS_KEY = 'mural_subjects';
 
@@ -1085,6 +1089,41 @@ export default function BoardPage() {
     };
   }, [gridMode, currentFolder]);
 
+  // Desempenho com muitos post-its: só "respira" quem está na tela. Um único observador marca os de fora
+  // com .offscreen; se mais de MANY_VISIBLE estiverem visíveis, o mural ganha .many-notes (sem animação).
+  // Tudo direto nas classes, sem redesenhar os post-its.
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || typeof IntersectionObserver === 'undefined') return;
+    const visible = new Set();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          e.target.classList.toggle('offscreen', !e.isIntersecting);
+          if (e.isIntersecting) visible.add(e.target);
+          else visible.delete(e.target);
+        }
+        for (const el of visible) if (!el.isConnected) visible.delete(el); // post-it que saiu da tela de vez
+        board.classList.toggle('many-notes', visible.size > MANY_VISIBLE);
+      },
+      { root: board, rootMargin: '300px' },
+    );
+    const watch = (root) => {
+      if (root.nodeType !== 1) return;
+      if (root.matches('.postit')) io.observe(root);
+      root.querySelectorAll?.('.postit').forEach((el) => io.observe(el));
+    };
+    watch(board);
+    // post-its que chegam depois (trocar de pasta, criar, carregar) também passam a ser observados
+    const mo = new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach(watch)));
+    mo.observe(board, { childList: true, subtree: true });
+    return () => {
+      mo.disconnect();
+      io.disconnect();
+      board.classList.remove('many-notes');
+    };
+  }, []);
+
   // começar uma seta: arrastando a bolinha do post-it (e) ou pelo menu ⋯ (sem e: depois clica no destino)
   const startLink = (note, e) => {
     if (e) setLinking({ from: note.id, to: toBoard(e.clientX, e.clientY), drag: true });
@@ -1294,6 +1333,7 @@ export default function BoardPage() {
                   onLinkStart={gridMode ? undefined : startLink}
                   onLinkTarget={handleLinkTarget}
                   linkCount={gridMode ? linkCount[note.id] ?? 0 : 0}
+                  quiet={notes.length > QUIET_ENTRY}
                 />
               ))}
             </AnimatePresence>

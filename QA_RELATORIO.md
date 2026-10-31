@@ -13,14 +13,14 @@ testes automáticos, segurança, funcional ponta a ponta, celular, desempenho e 
 | Segurança (24 sondagens) | ✅ 16 · ❌ 8 (7 são cabeçalhos ausentes) |
 | Funcional ponta a ponta (PC) | ✅ **todos os 22 passos** |
 | Celular 375 px | ✅ fluxos ok · ⚠️ alvos de toque pequenos |
-| Desempenho com 201 post-its | ❌ **14–31 fps** (meta: 60) |
+| Desempenho com 201 post-its | ✅ **corrigido** — parado 60 fps, zoom 44 fps, rolagem 38 fps (era 16 / 12 / 18) |
 | Acessibilidade automática | ✅ nomes, rótulos, idioma, "reduzir movimento" · ⚠️ foco fraco, sem títulos |
 
 ## 🔴🟠 Achados (do mais grave para o menos)
 
 | # | Gravidade | Achado | Evidência | Como resolver |
 |---|---|---|---|---|
-| Q1 | 🟠 **Alta** | **Mural pesado com muitos post-its.** Com 201 post-its: parado 27–31 fps, zoom 17 fps, rolagem 14 fps, 20 travadas na rolagem. | Experimento: tirar o "respirar" dos post-its sobe de 31 → **50 fps**; sem nenhuma animação, 57 fps. 246 animações CSS rodando ao mesmo tempo. | Animar só os post-its **visíveis na tela** (IntersectionObserver), pausar animações durante zoom/rolagem e desligar o "respirar" acima de ~40 post-its. |
+| Q1 | ✅ **Corrigido** | **Mural pesado com muitos post-its.** Com 201 post-its: parado 27–31 fps, zoom 17 fps, rolagem 14 fps, 20 travadas na rolagem. | Experimento: tirar o "respirar" dos post-its sobe de 31 → **50 fps**; sem nenhuma animação, 57 fps. 246 animações CSS rodando ao mesmo tempo. | Animar só os post-its **visíveis na tela** (IntersectionObserver), pausar animações durante zoom/rolagem e desligar o "respirar" acima de ~40 post-its. |
 | Q2 | 🟠 Alta | **Biblioteca `nodemailer` vulnerável** (versão 6): 20+ alertas, incluindo injeção de comando SMTP e e-mail indo para domínio errado. | `npm audit` no back. Risco atual **baixo**: o e-mail de "esqueci a senha" não está ligado nem configurado. | Atualizar para a versão corrigida (`npm i nodemailer@latest`) e rodar os testes. |
 | Q3 | 🟠 Média | **Faltam cabeçalhos de segurança** no front e no back: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`. | Sondagem direta. | Adicionar `headers()` no `next.config.mjs` e um middleware no Express (ou `helmet`). Protege contra clickjacking e alguns ataques de script. |
 | Q4 | 🟠 Média | **Texto grande demais dá erro 500** em vez de recusar educadamente (413). | Corpo de 3 MB → 500; log: `PayloadTooLargeError` (`entity.too.large`). | Tratar `err.type === 'entity.too.large'` no `errorHandler` → 413 "Texto grande demais". |
@@ -81,3 +81,35 @@ no post-it abre a edição** · ⋯ com área de toque de 46 px.
 
 Contas `qa.*@teste.dev` ("QA Ana", "QA Beto", "Quésia QA", "Celina QA" — esta com **201 post-its** e 59 fios
 para o teste de carga). Só existem no banco do notebook (`backend/data/`, fora do GitHub).
+
+---
+
+## ✅ Q1 corrigido — desempenho com muitos post-its (31/10/2026)
+
+Medido no **build de produção**, 201 post-its e 59 fios, 1366×768, comparação A/B na mesma tela
+(A = otimizações desligadas à força, B = como ficou):
+
+| 201 post-its | Antes | Depois |
+|---|---|---|
+| Parado | 16 fps · 10 travadas | **60 fps · 0 travadas** |
+| Zoom com Ctrl + roda | 12 fps · 13 travadas | **44 fps · 0 travadas** |
+| Rolagem | 18 fps · 11 travadas | **38 fps** · 4 travadas |
+
+**O que mudou** (tudo por classes no DOM, sem redesenhar os post-its):
+
+1. **Só "respira" quem está na tela:** um único `IntersectionObserver` (com folga de 300 px) marca os de fora
+   com `.offscreen`; um `MutationObserver` acompanha os post-its que chegam depois (troca de pasta, criar).
+2. **Muitos visíveis** (mais de 40, zoom afastado): o mural ganha `.many-notes` e ninguém "respira".
+3. **Mural em movimento** (`.is-moving`, ligado pelo motor do mural no zoom/arrastar/rolar/inércia):
+   animações pausadas, mural vira camada da placa de vídeo (`will-change`), vidro fosco
+   (`backdrop-filter`) trocado por fundo sólido até parar, e post-its sem eventos de mouse (menos o que
+   está sendo arrastado).
+4. **Fora da tela, o navegador nem desenha o conteúdo** (`content-visibility: auto` só nos `.offscreen`,
+   com `contain-intrinsic-size: auto` para lembrar o tamanho real) — maior ganho na rolagem.
+5. **Minimapa** atualiza no máximo ~12×/s durante o movimento (antes: a cada quadro).
+6. **Pasta com mais de 40 post-its:** eles aparecem direto, sem a animação de "cair" um por um.
+
+**Conferido depois da mudança:** 0 alturas alteradas (fios, minimapa e mapa de ideias continuam certos) ·
+59 fios desenhados · menu ⋯ abre inteiro · texto fora da tela continua acessível (leitor de tela / busca) ·
+nenhum erro no console. Ideias descartadas pelo próprio teste: tirar a sombra durante o movimento
+(**piorou**: 38 → 12 fps) e `content-visibility: hidden` (rápido, mas esconde o texto de leitores de tela).

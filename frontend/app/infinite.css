@@ -552,3 +552,60 @@ html.theme-light .minimap-canvas rect:not(.minimap-view) {
   stroke-width: 0.8;
   opacity: 1;
 }
+
+/* =====================================================================
+   Desempenho com muitos post-its (QA — Q1)
+   ===================================================================== */
+/* fora da tela: não "respira" (ninguém está vendo) */
+.postit.offscreen {
+  animation: none !important;
+}
+
+/* muitos post-its visíveis (zoom afastado): sem "respirar" — o movimento nem aparece, só pesa */
+.board.many-notes .postit {
+  animation: none !important;
+}
+
+/* mural em movimento (zoom/arrastar/rolar): pausa as animações e o mural vira uma camada da placa de vídeo */
+.board.is-moving .postit,
+.board.is-moving .pin,
+.board.is-moving .link-preview {
+  animation-play-state: paused !important;
+}
+
+.board.is-moving .canvas-zoom {
+  will-change: transform;
+}
+
+/* durante o movimento ninguém consegue passar o mouse com calma: sem efeitos de hover caros
+   (menos no post-it que está sendo arrastado até a borda — ele precisa continuar recebendo o mouse) */
+.board.is-moving .postit:not(.is-dragging) {
+  pointer-events: none;
+}
+
+/* vidro fosco (backdrop-filter) é recalculado a cada quadro quando o mural passa por baixo:
+   durante o movimento vira um fundo sólido quase igual; quando o mural para, o vidro volta */
+.board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .weather, .upcoming, .zoom-control, .tool-btn, .focus-timer, .minimap, .brand) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+  background-color: rgba(24, 24, 32, 0.94) !important;
+}
+
+html.theme-light .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+/* fora da tela, o navegador nem desenha o conteúdo do post-it (rolagem 20 → 51 fps com 201 post-its).
+   Só nos .offscreen: esse recurso corta o que passa da borda (fita, menu ⋯, bolinha), e os visíveis precisam disso.
+   contain-intrinsic-size "auto" faz o navegador lembrar o tamanho real — fios, minimapa e mapa de ideias não mudam.
+   Com "auto" (e não "hidden") o texto continua acessível a leitor de tela e à busca da página. */
+.canvas.free .postit {
+  contain-intrinsic-size: auto 230px auto 210px;
+}
+
+.canvas.free .postit.offscreen {
+  content-visibility: auto;
+}

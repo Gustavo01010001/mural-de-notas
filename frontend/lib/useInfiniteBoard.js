@@ -39,6 +39,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
   const pan = useRef(null);
   const space = useRef(false);
   const gesturing = useRef(false);
+  const movingTimer = useRef(null);
 
   size.current = contentSize;
   // estado do React mudou (botões, carregar): segue ele, a não ser no meio de um gesto
@@ -46,9 +47,20 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
     if (!gesturing.current) z.current = zoom;
   }, [zoom]);
 
+  // Enquanto o mural se mexe (zoom, arrastar, rolar, inércia), a classe "is-moving" pausa as animações
+  // dos post-its e transforma o mural numa camada da placa de vídeo — é o que deixa o movimento liso.
+  const markMoving = useCallback(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    if (!board.classList.contains('is-moving')) board.classList.add('is-moving');
+    clearTimeout(movingTimer.current);
+    movingTimer.current = setTimeout(() => board.classList.remove('is-moving'), 180);
+  }, [boardRef]);
+
   const notify = useCallback(() => {
+    markMoving();
     for (const fn of listeners.current) fn();
-  }, []);
+  }, [markMoving]);
 
   const subscribe = useCallback((fn) => {
     listeners.current.add(fn);
@@ -320,7 +332,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
     };
   }, [boardRef, enabled, apply, notify, scheduleCommit, stopMotion, zoomBy, zoomTo]);
 
-  useEffect(() => () => clearTimeout(commitTimer.current), []);
+  useEffect(() => () => (clearTimeout(commitTimer.current), clearTimeout(movingTimer.current)), []);
 
   // zoom "ao vivo" (pode estar à frente do estado do React no meio de um gesto)
   const getZoom = useCallback(() => z.current, []);

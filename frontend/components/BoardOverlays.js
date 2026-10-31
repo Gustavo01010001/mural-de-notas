@@ -284,15 +284,21 @@ export function Minimap({ notes, sizes, drag, boardRef, board, boardTop, onClose
 
   useEffect(() => {
     read();
-    let raf = 0;
+    // durante o movimento, no máximo ~12 atualizações por segundo (com 200 post-its, redesenhar a cada quadro pesa)
+    let timer = 0;
+    let last = 0;
     const off = board.subscribe(() => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(read);
+      const wait = Math.max(0, 80 - (performance.now() - last));
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        last = performance.now();
+        read();
+      }, wait);
     });
     window.addEventListener('resize', read);
     return () => {
       off();
-      cancelAnimationFrame(raf);
+      clearTimeout(timer);
       window.removeEventListener('resize', read);
     };
   }, [board, read]);

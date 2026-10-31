@@ -795,7 +795,7 @@ html.theme-light .field-hint.warn {
     right: 146px !important;
   }
 
-  .upcoming.collapsed h4 {
+  .upcoming.collapsed .upcoming-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -885,7 +885,7 @@ html.theme-light :is(.folder-panel, .drawer, .search-panel, .trash-panel, .share
   vertical-align: -0.18em;
 }
 
-:is(.tool-btn, .sel-btn, .sel-move > span, .focus-mode, .segmented-label, .modal-label, .folder-special button, .folder-add, .extra-chip, .account-toggle, .btn-small, .search-recent button, .sf-check, .upcoming-head h4, .tag-filter-pill, .folder-shared-badge, .date-field > span:first-child, .folder-select > span) {
+:is(.tool-btn, .sel-btn, .sel-move > span, .focus-mode, .segmented-label, .modal-label, .folder-special button, .folder-add, .extra-chip, .account-toggle, .btn-small, .search-recent button, .sf-check, .upcoming-label, .tag-filter-pill, .folder-shared-badge, .date-field > span:first-child, .folder-select > span) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1239,4 +1239,31 @@ html.theme-light .my-code {
 html.theme-light .postit::after {
   background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.55) 50%);
   filter: drop-shadow(1px -1px 1.5px rgba(80, 60, 0, 0.18));
+}
+
+/* =====================================================================
+   Foco do teclado bem visível (WCAG 2.4.7): anel na cor de destaque com
+   uma borda escura por fora, para aparecer no fundo escuro, no claro e
+   em cima do post-it amarelo. Só no TAB (:focus-visible): clicar com o
+   mouse não mostra o anel. :where() deixa os focos próprios valerem.
+   ===================================================================== */
+:where(a, button, select, summary, [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.55);
+}
+
+/* o "Próximas datas" vira um título de verdade (leitor de tela) sem mudar o visual */
+.upcoming-title {
+  margin: 0;
+  font: inherit;
+}
+
+/* calendário: aviso de datas no mês seguinte */
+.calendar-ahead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  margin: 2px 14px 6px;
 }

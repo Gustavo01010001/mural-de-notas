@@ -1202,6 +1202,9 @@ export default function BoardPage() {
       {!calm && <div className="spotlight" />}
       <div className="warm-filter" style={{ opacity: WARM_ALPHA[settings.warmFilter] ?? 0 }} />
 
+      {/* títulos para o leitor de tela navegar (atalho H); na tela, o nome da pasta já aparece no seletor */}
+      <h1 className="sr-only">Mural de Notas: {folderName(currentFolder)}</h1>
+
       <header className="topbar">
         <motion.div className="brand" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
           <span className="brand-pin">📌</span>
@@ -1274,6 +1277,10 @@ export default function BoardPage() {
           />
         )}
       </AnimatePresence>
+
+      <h2 className="sr-only">
+        {shownNotes.length} post-it{shownNotes.length === 1 ? '' : 's'} nesta pasta
+      </h2>
 
       {/* Cada pasta é um mural: ao trocar, o mural desliza para o lado e os post-its da nova caem */}
       <AnimatePresence mode="wait" initial={false}>
@@ -1481,20 +1488,22 @@ export default function BoardPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <button type="button" className="upcoming-head" onClick={() => setUpcomingOpen((o) => !o)} aria-expanded={upcomingOpen}>
-            <h4>
-              {upcomingOpen ? (
-                'Próximas datas'
-              ) : (
-                <>
-                  <Icon name="calendar" size={15} /> {upcoming.length} data{upcoming.length === 1 ? '' : 's'} chegando
-                </>
-              )}
-            </h4>
-            <motion.span className="chevron" animate={{ rotate: upcomingOpen ? 0 : 180 }}>
-              ▾
-            </motion.span>
-          </button>
+          <h2 className="upcoming-title">
+            <button type="button" className="upcoming-head" onClick={() => setUpcomingOpen((o) => !o)} aria-expanded={upcomingOpen}>
+              <span className="upcoming-label">
+                {upcomingOpen ? (
+                  'Próximas datas'
+                ) : (
+                  <>
+                    <Icon name="calendar" size={15} /> {upcoming.length} data{upcoming.length === 1 ? '' : 's'} chegando
+                  </>
+                )}
+              </span>
+              <motion.span className="chevron" animate={{ rotate: upcomingOpen ? 0 : 180 }}>
+                ▾
+              </motion.span>
+            </button>
+          </h2>
           <AnimatePresence initial={false}>
             {upcomingOpen && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}>

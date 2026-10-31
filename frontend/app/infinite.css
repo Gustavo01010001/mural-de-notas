@@ -372,6 +372,13 @@ html.theme-light .link-shadow {
   outline-offset: 3px;
 }
 
+/* as camadas altas abaixo (tachinhas, barrinha do fio) ficam presas dentro do mural: sem isso, no modo
+   grade (sem o zoom, que já isola) elas passavam por cima do calendário e das outras janelas */
+.canvas-zoom,
+.canvas-inner-grid {
+  isolation: isolate;
+}
+
 /* tachinhas (por cima dos post-its, só nos que têm fio) */
 .pins-layer {
   position: absolute;

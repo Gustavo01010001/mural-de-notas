@@ -14,7 +14,7 @@ testes automáticos, segurança, funcional ponta a ponta, celular, desempenho e 
 | Funcional ponta a ponta (PC) | ✅ **todos os 22 passos** |
 | Celular 375 px | ✅ fluxos ok · ✅ alvos de toque ≥ 44 px |
 | Desempenho com 201 post-its | ✅ **corrigido** — parado 60 fps, zoom 44 fps, rolagem 38 fps (era 16 / 12 / 18) |
-| Acessibilidade automática | ✅ nomes, rótulos, idioma, "reduzir movimento" · ⚠️ foco fraco, sem títulos |
+| Acessibilidade automática | ✅ nomes, rótulos, idioma, "reduzir movimento" · ✅ foco forte e títulos (corrigido) |
 
 ## 🔴🟠 Achados (do mais grave para o menos)
 
@@ -25,11 +25,11 @@ testes automáticos, segurança, funcional ponta a ponta, celular, desempenho e 
 | Q3 | ✅ **Corrigido** | **Faltam cabeçalhos de segurança** no front e no back: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`. | Sondagem direta. | Adicionar `headers()` no `next.config.mjs` e um middleware no Express (ou `helmet`). Protege contra clickjacking e alguns ataques de script. |
 | Q4 | ✅ **Corrigido** | **Texto grande demais dá erro 500** em vez de recusar educadamente (413). | Corpo de 3 MB → 500; log: `PayloadTooLargeError` (`entity.too.large`). | Tratar `err.type === 'entity.too.large'` no `errorHandler` → 413 "Texto grande demais". |
 | Q5 | ✅ **Corrigido** | **Alvos de toque pequenos no celular** (mínimo recomendado 44×44 px). | Bolinhas de cor do post-it **20×20**, "Expandir clima" **24×24**, botões do formulário 26–33 px de altura, topo 40×40. | Área de toque invisível de 44 px em volta (como já foi feito no ⋯ do post-it). |
-| Q6 | 🟡 Baixa | **Demora para mostrar 201 post-its** (~6,5 s até todos aparecerem). | API responde em **57 ms**; o tempo é montagem + animação de entrada de 201 post-its no modo de desenvolvimento. | Medir no build de produção; animar a entrada só dos visíveis; virtualizar quem está muito fora da tela. |
-| Q7 | 🟡 Baixa | **Contorno de foco do teclado fraco** (pendência I10 do relatório de usuário novo). | Botão + sem contorno visível ao focar. | Contorno amarelo de 3 px em `:focus-visible` para todos os botões. |
-| Q8 | 🟡 Baixa | **Mural sem títulos de seção (h1/h2)** para leitor de tela navegar. | Nenhum `h1`/`h2` na tela principal. | Um `h1` visualmente escondido ("Mural — pasta X") e `h2` nos painéis. |
+| Q6 | ✅ **Corrigido** | **Demora para mostrar 201 post-its** (~6,5 s até todos aparecerem). | API responde em **57 ms**; o tempo é montagem + animação de entrada de 201 post-its no modo de desenvolvimento. | Medir no build de produção; animar a entrada só dos visíveis; virtualizar quem está muito fora da tela. |
+| Q7 | ✅ **Corrigido** | **Contorno de foco do teclado fraco** (pendência I10 do relatório de usuário novo). | Botão + sem contorno visível ao focar. | Contorno amarelo de 3 px em `:focus-visible` para todos os botões. |
+| Q8 | ✅ **Corrigido** | **Mural sem títulos de seção (h1/h2)** para leitor de tela navegar. | Nenhum `h1`/`h2` na tela principal. | Um `h1` visualmente escondido ("Mural — pasta X") e `h2` nos painéis. |
 | Q9 | ✅ **Corrigido** | Servidores **se anunciam** (`X-Powered-By: Express` / `Next.js`). | Sondagem. | `app.disable('x-powered-by')` e `poweredByHeader: false`. |
-| Q10 | 💡 Sugestão | Data **no começo do mês seguinte** não aparece ao abrir o calendário (ele abre no mês atual). | Prova em 01/11 vista só depois de clicar "próximo mês". | Dica no calendário: "📅 1 data no próximo mês →". |
+| Q10 | ✅ **Corrigido** | Data **no começo do mês seguinte** não aparece ao abrir o calendário (ele abre no mês atual). | Prova em 01/11 vista só depois de clicar "próximo mês". | Dica no calendário: "📅 1 data no próximo mês →". |
 
 ## ✅ O que passou
 
@@ -130,5 +130,21 @@ nenhum erro no console. Ideias descartadas pelo próprio teste: tirar a sombra d
 projetos do mesmo PC. **Por que CSP sem "nonce":** o modelo com nonce obriga todas as páginas a serem geradas
 na hora (sem cache); o modelo sem nonce da documentação do Next já bloqueia scripts e iframes de fora.
 
-**Ainda abertos (baixa prioridade):** Q6 (demora para mostrar 201 post-its), Q7 (contorno de foco),
-Q8 (títulos para leitor de tela), Q10 (aviso de data no mês seguinte).
+---
+
+## ✅ Q6, Q7, Q8 e Q10 corrigidos — todos os achados resolvidos (31/10/2026)
+
+| # | O que mudou | Prova |
+|---|---|---|
+| Q6 | A correção do Q1 já tirou a animação de "cair um por um" em pastas com mais de 40 post-its; aqui foi **medido**. | Trocar de uma pasta vazia para a de 201 post-its (3 repetições): **build de produção ~0,5 s** até todos aparecerem (0,25 s disso é o deslize do mural) e maior travada ~150 ms (abaixo dos 200 ms considerados "bom"); em desenvolvimento ~1,1 s. **Antes: ~6,5 s.** |
+| Q7 | Anel de foco em tudo que se usa pelo teclado (`:focus-visible`): 3 px na cor de destaque + borda escura de 6 px por fora, para aparecer no fundo escuro, no claro e **em cima do post-it amarelo**. Clicar com o mouse não mostra o anel. | TAB de verdade no navegador: o ⋯ do post-it rosa ganha o anel amarelo com borda escura |
+| Q8 | `h1` (escondido na tela) "Mural de Notas: *pasta*", `h2` "*N* post-its nesta pasta" e cada post-it continua `h3`; "Próximas datas" virou `h2` de verdade (antes era um `h4` dentro do botão, o que nem é permitido) **sem mudar o visual**. As janelas já tinham `h2`. | Estrutura lida no navegador: h1 → h2 → h3 (201) |
+| Q10 | Calendário mostra **"📅 1 data no próximo mês →"** quando o mês seguinte tem algo marcado; clicar vai para lá. | Prova de teste em 03/11 com o calendário aberto em outubro: aviso aparece; clique leva a novembro com o dia 3 marcado; em novembro (dezembro vazio) o aviso some |
+
+**Achado extra no caminho (corrigido):** as **tachinhas dos fios apareciam por cima do calendário** e das
+outras janelas. A camada das tachinhas tem uma "altura" de 100000 para ficar sobre os post-its, e sem uma
+pilha própria ela escapava para a página inteira (a janela tem 20000). Agora a camada do mural é isolada
+(`isolation: isolate`): as tachinhas continuam sobre os post-its, mas abaixo das janelas. Conferido com o
+calendário aberto em 1366 px: 2 tachinhas atrás do painel, **0 aparecendo por cima**.
+
+**Todos os 10 achados do relatório estão corrigidos.** Nenhum erro no console depois das mudanças.

@@ -22,6 +22,8 @@ export default function CalendarPanel({ open, onClose, onPick, onAuthError }) {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(null);
   const [dir, setDir] = useState(0);
+  // quantas datas há no mês seguinte ao que está na tela (aviso "1 data no próximo mês →")
+  const [ahead, setAhead] = useState(null);
 
   const load = useCallback(
     async (m) => {
@@ -29,6 +31,9 @@ export default function CalendarPanel({ open, onClose, onPick, onAuthError }) {
         const res = await api(`/calendar${m ? `?month=${m}` : ''}`);
         setData(res);
         setMonth(res.month);
+        api(`/calendar?month=${shiftMonth(res.month, 1)}`)
+          .then((next) => setAhead({ month: res.month, count: Object.values(next.days).reduce((s, d) => s + d.length, 0) }))
+          .catch(() => setAhead(null));
         return res;
       } catch (err) {
         onAuthError(err);
@@ -123,6 +128,12 @@ export default function CalendarPanel({ open, onClose, onPick, onAuthError }) {
               );
             })}
           </div>
+
+          {ahead?.month === month && ahead.count > 0 && (
+            <button type="button" className="btn-ghost-light small calendar-ahead" onClick={() => go(1)}>
+              <Icon name="calendar" size={14} /> {ahead.count} data{ahead.count === 1 ? '' : 's'} no próximo mês →
+            </button>
+          )}
 
           <div className="calendar-list">
             {selected && (

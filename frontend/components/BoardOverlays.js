@@ -1,13 +1,54 @@
 'use client';
 
 // Camadas do mural infinito: setas entre post-its, zonas de assunto (por etiqueta) e minimapa.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { tagColor } from '@/lib/noteHelpers';
 import Icon from './Icon';
 
 const DEFAULT_W = 230;
 const DEFAULT_H = 210;
+
+// Posição "ao vivo" do post-it sendo arrastado ({ id, x, y } ou null), guardada fora do estado da página:
+// a cada quadro do arraste só as camadas que desenham a partir dela (fios, tachinhas, zonas, minimapa)
+// se refazem — antes a página inteira era refeita 60 vezes por segundo
+export function createLiveDrag() {
+  let value = null;
+  const subs = new Set();
+  return {
+    get: () => value,
+    set: (next) => {
+      value = next;
+      subs.forEach((fn) => fn());
+    },
+    subscribe: (fn) => (subs.add(fn), () => subs.delete(fn)),
+  };
+}
+const noDrag = () => null;
+const useLiveDrag = (store) => useSyncExternalStore(store.subscribe, store.get, noDrag);
+
+// Mesma posição, mas no máximo ~12 vezes por segundo (minimapa: ninguém vê a diferença e são 200 retângulos)
+function useLiveDragThrottled(store, ms = 80) {
+  const [drag, setDrag] = useState(store.get);
+  useEffect(() => {
+    let timer = 0;
+    let last = 0;
+    const off = store.subscribe(() => {
+      clearTimeout(timer);
+      const next = store.get();
+      if (!next) return setDrag(null); // soltou: atualiza na hora
+      timer = setTimeout(() => {
+        last = performance.now();
+        setDrag(store.get());
+      }, Math.max(0, ms - (performance.now() - last)));
+    });
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [store, ms]);
+  return drag;
+}
 
 // Tamanho real de cada post-it na tela (medido; acompanha quando o texto muda ou alguém redimensiona)
 export function useNoteSizes(notes, layerRef) {
@@ -89,7 +130,22 @@ const threadHex = (id) => THREAD_COLORS.find((c) => c.id === id)?.hex ?? THREAD_
  * style "thread": fio de detetive preso por tachinhas (padrão) · "arrow": seta simples
  * zoom: para a barrinha de opções do fio ficar do mesmo tamanho em qualquer zoom
  */
-export function LinksLayer({ links, notes, sizes, drag, preview, onRemove, onColor, style = 'thread', zoom = 1, canEdit = true }) {
+// Um fio (memorizado: arrastando um post-it, só os fios dele são refeitos)
+const LinkItem = memo(function LinkItem({ id, from, to, d, color, label, thread, hover, onPick }) {
+  return (
+    <g className={`link ${hover ? 'hover' : ''}`} data-a={from} data-b={to} style={{ '--thread': threadHex(color) }}>
+      {thread && <path d={d} className="link-shadow" vectorEffect="non-scaling-stroke" />}
+      <path d={d} className="link-line" markerEnd={thread ? undefined : 'url(#link-arrow)'} vectorEffect="non-scaling-stroke" />
+      {/* faixa invisível mais grossa: fácil de clicar/tocar */}
+      <path d={d} className="link-hit" onClick={() => onPick(id)}>
+        <title>{`${label} — clique para trocar a cor ou tirar`}</title>
+      </path>
+    </g>
+  );
+});
+
+export function LinksLayer({ links, notes, sizes, liveDrag, preview, onRemove, onColor, style = 'thread', zoom = 1, canEdit = true }) {
+  const drag = useLiveDrag(liveDrag);
   const [active, setActive] = useState(null);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const thread = style === 'thread';
@@ -142,20 +198,7 @@ export function LinksLayer({ links, notes, sizes, drag, preview, onRemove, onCol
         </marker>
       </defs>
       {drawn.map((l) => (
-        <g
-          key={l.id}
-          className={`link ${active === l.id ? 'hover' : ''}`}
-          data-a={l.from}
-          data-b={l.to}
-          style={{ '--thread': threadHex(l.color) }}
-        >
-          {thread && <path d={l.d} className="link-shadow" vectorEffect="non-scaling-stroke" />}
-          <path d={l.d} className="link-line" markerEnd={thread ? undefined : 'url(#link-arrow)'} vectorEffect="non-scaling-stroke" />
-          {/* faixa invisível mais grossa: fácil de clicar/tocar */}
-          <path d={l.d} className="link-hit" onClick={() => setActive(l.id)}>
-            <title>{`${l.label} — clique para trocar a cor ou tirar`}</title>
-          </path>
-        </g>
+        <LinkItem key={l.id} id={l.id} from={l.from} to={l.to} d={l.d} color={l.color} label={l.label} thread={thread} hover={active === l.id} onPick={setActive} />
       ))}
       {previewPath && <path d={previewPath} className="link-preview" vectorEffect="non-scaling-stroke" markerEnd={thread ? undefined : 'url(#link-arrow)'} />}
     </svg>
@@ -199,8 +242,19 @@ export function LinksLayer({ links, notes, sizes, drag, preview, onRemove, onCol
   );
 }
 
+const Pin = memo(function Pin({ id, x, y, color }) {
+  return (
+    <g className="pin" data-note={id} transform={`translate(${x} ${y})`} style={{ '--thread': threadHex(color) }}>
+      <ellipse cx="2" cy="5" rx="7" ry="3" className="pin-shadow" />
+      <circle r="7.5" className="pin-head" />
+      <circle cx="-2.4" cy="-2.6" r="2.4" className="pin-shine" />
+    </g>
+  );
+});
+
 // Tachinhas por cima dos post-its (só nos que têm fio): mostram de onde sai cada fio
-export function PinsLayer({ links, notes, sizes, drag }) {
+export function PinsLayer({ links, notes, sizes, liveDrag }) {
+  const drag = useLiveDrag(liveDrag);
   const byId = new Map(notes.map((n) => [n.id, n]));
   const pins = new Map();
   for (const l of links) {
@@ -213,11 +267,7 @@ export function PinsLayer({ links, notes, sizes, drag }) {
   return (
     <svg className="pins-layer" aria-hidden>
       {[...pins.values()].map((p) => (
-        <g key={p.id} className="pin" data-note={p.id} transform={`translate(${p.x} ${p.y})`} style={{ '--thread': threadHex(p.color) }}>
-          <ellipse cx="2" cy="5" rx="7" ry="3" className="pin-shadow" />
-          <circle r="7.5" className="pin-head" />
-          <circle cx="-2.4" cy="-2.6" r="2.4" className="pin-shine" />
-        </g>
+        <Pin key={p.id} {...p} />
       ))}
     </svg>
   );
@@ -243,7 +293,8 @@ export function subjectGroups(notes, sizes, drag) {
     });
 }
 
-export function SubjectZones({ notes, sizes, drag, onPick }) {
+export function SubjectZones({ notes, sizes, liveDrag, onPick }) {
+  const drag = useLiveDrag(liveDrag);
   const zones = subjectGroups(notes, sizes, drag);
   return (
     <AnimatePresence>
@@ -270,7 +321,13 @@ export function SubjectZones({ notes, sizes, drag, onPick }) {
 const MAP_W = 210;
 const MAP_H = 140;
 
-export function Minimap({ notes, sizes, drag, boardRef, board, boardTop, onClose }) {
+// um post-it no minimapa (memorizado: no arraste só o retângulo do arrastado muda)
+const MiniRect = memo(function MiniRect({ x, y, w, h, color }) {
+  return <rect x={x} y={y} width={w} height={h} rx="1.5" style={{ fill: `var(--${color})` }} />;
+});
+
+export function Minimap({ notes, sizes, liveDrag, boardRef, board, boardTop, onClose }) {
+  const drag = useLiveDragThrottled(liveDrag);
   const [view, setView] = useState(null);
   const dragging = useRef(false);
 
@@ -352,7 +409,7 @@ export function Minimap({ notes, sizes, drag, boardRef, board, boardTop, onClose
       >
         {rects.map(({ n, r }) => {
           const p = toMap(r.x, r.y);
-          return <rect key={n.id} x={p.x} y={p.y} width={Math.max(2, r.w * scale)} height={Math.max(2, r.h * scale)} rx="1.5" style={{ fill: `var(--${n.color})` }} />;
+          return <MiniRect key={n.id} x={p.x} y={p.y} w={Math.max(2, r.w * scale)} h={Math.max(2, r.h * scale)} color={n.color} />;
         })}
         <rect className="minimap-view" x={v.x} y={v.y} width={Math.max(6, view.w * scale)} height={Math.max(6, view.h * scale)} rx="3" />
       </svg>

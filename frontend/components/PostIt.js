@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { countdownLabel, eventIcon, formatEventDate, googleCalendarUrl, repeatLabel } from '@/lib/format';
 import { linkify, tagColor } from '@/lib/noteHelpers';
@@ -43,7 +43,7 @@ function Linked({ text }) {
 
 // grid = modo "grade" do celular: o post-it entra no fluxo da página (sem arrastar),
 // mas mantém as animações de entrada, toque e o "respirar"
-export default function PostIt({
+function PostIt({
   note,
   calm = false,
   found = false,
@@ -439,3 +439,6 @@ export default function PostIt({
     </motion.div>
   );
 }
+
+// Só redesenha quando as próprias propriedades mudam (com 200 post-its, arrastar um não refaz os outros)
+export default memo(PostIt);

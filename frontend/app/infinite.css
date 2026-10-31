@@ -673,3 +673,64 @@ html.theme-light .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .
     min-height: 44px;
   }
 }
+
+/* =====================================================================
+   Modo leve (aparelhos modestos: celulares com pouca memória, PCs fracos).
+   O mesmo visual com efeitos mais baratos para a placa de vídeo: sem vidro
+   fosco, sombras de uma camada só e nada se mexendo sozinho no fundo.
+   Liga sozinho ou em Configurações → Desempenho (lib/performance.js).
+   ===================================================================== */
+html.lite *,
+html.lite *::before,
+html.lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* sem o desfoque, o "vidro" quase transparente vira um fundo sólido quase igual */
+html.lite :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+  background-color: rgba(24, 24, 32, 0.94) !important;
+}
+
+html.lite.theme-light :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+/* sombra do post-it: uma camada (antes duas, uma delas bem larga) */
+html.lite .postit {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  transition: none;
+}
+
+html.lite .postit:hover {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+html.lite .postit.is-dragging {
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.55);
+}
+
+html.lite.theme-light .postit {
+  box-shadow: 0 4px 12px rgba(60, 40, 0, 0.22);
+}
+
+html.lite.theme-light .postit::after {
+  filter: none;
+}
+
+/* nada "respirando", piscando ou brilhando em loop (o post-it encontrado pela busca continua piscando) */
+html.lite .postit:not(.is-found),
+html.lite :is(.stars, .brand-pin, .fab, .pin) {
+  animation: none !important;
+}
+
+html.lite .postit.is-found {
+  animation: found-ring 0.9s ease-in-out 3 !important;
+}
+
+/* post-it de hoje: no lugar do brilho pulsando (filtro animado, caro), um brilho fixo */
+html.lite .postit.is-today {
+  box-shadow:
+    0 0 0 3px rgba(255, 216, 77, 0.75),
+    0 6px 16px rgba(255, 216, 77, 0.35);
+}

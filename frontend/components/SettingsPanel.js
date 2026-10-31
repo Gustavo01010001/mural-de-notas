@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { COLORS } from '@/lib/format';
 import { SCENES, sceneFromWeather, sceneInfo } from '@/lib/scenes';
 import { playSound, setSoundPrefs } from '@/lib/sounds';
+import { autoReasonLabel } from '@/lib/performance';
 import AccountSection from './AccountSection';
 import Icon from './Icon';
 import MyCode from './MyCode';
@@ -80,6 +81,7 @@ export default function SettingsPanel({
   weather,
   autoCalm,
   onSnoozeAutoCalm,
+  perf,
   toast,
   onAuthError,
   onImported,
@@ -380,6 +382,32 @@ export default function SettingsPanel({
                   onChange={set('softNotes')}
                 />
               </section>
+
+              {perf && (
+                <section>
+                  <h3>Desempenho</h3>
+                  <Segmented
+                    label="Neste aparelho"
+                    value={perf.pref}
+                    onChange={perf.setPref}
+                    options={[
+                      { id: 'auto', label: 'Automático' },
+                      { id: 'full', label: 'Completo' },
+                      { id: 'lite', label: 'Leve' },
+                    ]}
+                  />
+                  <p className="set-note">
+                    {perf.pref === 'auto' &&
+                      (perf.lite
+                        ? `⚡ Modo leve ligado sozinho: ${autoReasonLabel(perf.autoReason)}.`
+                        : '✨ Este aparelho dá conta do visual completo.')}
+                    {perf.pref === 'full' && '✨ Visual completo sempre, mesmo se o aparelho sofrer.'}
+                    {perf.pref === 'lite' && '⚡ Modo leve sempre.'} O leve tira o vidro fosco, simplifica as sombras e
+                    deixa o fundo mais econômico: cores, post-its e tudo o que você usa continuam iguais. Vale só
+                    para este aparelho.
+                  </p>
+                </section>
+              )}
 
               <section>
                 <h3>Mural</h3>

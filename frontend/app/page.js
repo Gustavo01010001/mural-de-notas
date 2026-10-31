@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, clearSession, hasSession, migrateLegacyToken } from '@/lib/api';
@@ -23,7 +23,7 @@ import { useLiveFolder } from '@/lib/useLiveFolder';
 import { flattenTree } from '@/lib/folderTree';
 import { BoardTools, SelectionBar } from '@/components/BoardTools';
 import { boardStyles, useInfiniteBoard, ZOOM_MAX, ZOOM_MIN } from '@/lib/useInfiniteBoard';
-import { LinksLayer, Minimap, noteRect, PinsLayer, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
+import { createLiveDrag, LinksLayer, Minimap, noteRect, PinsLayer, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
 import { mindMapLayout } from '@/lib/mindMap';
 import { useWeather } from '@/lib/useWeather';
 import { applyAppearance } from '@/lib/appearance';
@@ -31,6 +31,7 @@ import { playSound, setSoundPrefs } from '@/lib/sounds';
 import FocusTimer from '@/components/FocusTimer';
 import Icon from '@/components/Icon';
 import { resolveScene } from '@/lib/scenes';
+import { usePerformanceMode } from '@/lib/performance';
 
 // O mural livre começa abaixo da barra do topo (senão os post-its de cima ficam escondidos atrás dela)
 const BOARD_TOP = 76;
@@ -110,6 +111,19 @@ function useIsMobile() {
   return mobile;
 }
 
+// Funções com identidade fixa que sempre chamam a versão mais nova (para o memo do PostIt funcionar:
+// arrastar, rolar ou dar zoom refaz só o post-it que mudou, não os 200 da tela)
+function useStableHandlers(handlers) {
+  const latest = useRef(handlers);
+  useLayoutEffect(() => {
+    latest.current = handlers;
+  });
+  const [stable] = useState(() =>
+    Object.fromEntries(Object.keys(handlers).map((k) => [k, (...args) => latest.current[k]?.(...args)])),
+  );
+  return stable;
+}
+
 function restartSession() {
   try {
     sessionStorage.setItem(SESSION_KEY, String(Date.now()));
@@ -152,6 +166,8 @@ export default function BoardPage() {
   const notified = useRef(new Set());
   const today = useRef(null);
   const boardRef = useRef(null);
+  const spotRef = useRef(null);
+  const perf = usePerformanceMode(); // modo leve em aparelhos modestos (sozinho ou nas Configurações)
 
   // Pastas: null = Mural geral; undefined = ainda carregando
   const [folders, setFolders] = useState([]);
@@ -183,7 +199,7 @@ export default function BoardPage() {
   // Mural infinito: setas entre post-its, "ligando" (escolhendo o destino), arraste ao vivo, minimapa e assuntos
   const [links, setLinks] = useState([]);
   const [linking, setLinking] = useState(null); // { from, to: {x,y} | null, drag }
-  const [liveDrag, setLiveDrag] = useState(null); // { id, x, y }
+  const [liveDrag] = useState(createLiveDrag); // posição ao vivo do arraste (só as camadas de fios/minimapa ouvem)
   const [showMinimap, setShowMinimap] = useState(true);
   const [showSubjects, setShowSubjects] = useState(false);
   const canvasRef = useRef(null);
@@ -503,17 +519,29 @@ export default function BoardPage() {
     return true;
   }
 
-  // Spotlight que segue o mouse no fundo preto
+  // Brilho que segue o mouse no fundo preto: só a camada dele se move (transform, feito pela placa de vídeo),
+  // no máximo uma vez por quadro. Antes a posição ia numa variável do mural inteiro e o navegador
+  // recalculava o estilo de todos os post-its a cada movimento do mouse (50 ms por movimento com 200).
   useEffect(() => {
-    const el = boardRef.current;
+    const el = spotRef.current;
     if (!el) return;
+    let raf = 0;
+    let x = 0;
+    let y = 0;
     const onMove = (e) => {
-      el.style.setProperty('--mx', `${e.clientX}px`);
-      el.style.setProperty('--my', `${e.clientY}px`);
+      x = e.clientX;
+      y = e.clientY;
+      raf ||= requestAnimationFrame(() => {
+        raf = 0;
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      });
     };
-    window.addEventListener('pointermove', onMove);
-    return () => window.removeEventListener('pointermove', onMove);
-  }, []);
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, [settings.calmMode, autoCalm, perf.lite]); // o brilho some no modo confortável/leve e volta depois
 
   // Pasta compartilhada: manda a posição do meu cursor em coordenadas do mural
   // (assim aparece no lugar certo para os outros mesmo com zoom/rolagem diferentes)
@@ -960,8 +988,8 @@ export default function BoardPage() {
   const gridMode = isMobile && settings.mobileLayout !== 'free';
   const z = gridMode ? 1 : zoom;
   // filtro por etiqueta (clicando numa #etiqueta do post-it)
-  const visibleNotes = tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes;
-  const shownNotes = gridMode ? [...visibleNotes].sort(readingOrder) : visibleNotes;
+  const visibleNotes = useMemo(() => (tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes), [notes, tagFilter]);
+  const shownNotes = useMemo(() => (gridMode ? [...visibleNotes].sort(readingOrder) : visibleNotes), [visibleNotes, gridMode]);
   // até onde vão os post-its (o espaço livre extra é somado em boardStyles)
   const canvasW = Math.max(0, ...notes.map((n) => n.x + (n.width ?? 230)));
   const canvasH = Math.max(0, ...notes.map((n) => n.y + (n.height ?? 300)));
@@ -985,6 +1013,25 @@ export default function BoardPage() {
   });
   const sizes = useNoteSizes(notes, layerRef);
 
+  // Grade do celular: rolar com o dedo também conta como "mural em movimento" (pausa as animações e o
+  // vidro fosco enquanto rola, como o motor do mural livre faz no PC)
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || !gridMode) return;
+    let timer = 0;
+    const onScroll = () => {
+      if (!board.classList.contains('is-moving')) board.classList.add('is-moving');
+      clearTimeout(timer);
+      timer = setTimeout(() => board.classList.remove('is-moving'), 180);
+    };
+    board.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      board.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+      board.classList.remove('is-moving');
+    };
+  }, [gridMode]);
+
   // "Ajustar à tela": enquadra todos os post-its visíveis
   fitRef.current = () => {
     if (!visibleNotes.length || gridMode) return;
@@ -1000,9 +1047,9 @@ export default function BoardPage() {
   // posição ao vivo do post-it sendo arrastado (no máximo 1 atualização por quadro)
   const handleDragMove = useCallback((id, p) => {
     cancelAnimationFrame(dragFrame.current);
-    if (!p) return setLiveDrag(null);
-    dragFrame.current = requestAnimationFrame(() => setLiveDrag({ id, ...p }));
-  }, []);
+    if (!p) return liveDrag.set(null);
+    dragFrame.current = requestAnimationFrame(() => liveDrag.set({ id, ...p }));
+  }, [liveDrag]);
 
   // tela → coordenadas do mural
   const toBoard = (cx, cy) => {
@@ -1047,11 +1094,14 @@ export default function BoardPage() {
   }
 
   // quantos fios cada post-it tem (o indicador 🔗 aparece na grade do celular, onde os fios não são desenhados)
-  const linkCount = {};
-  for (const l of links) {
-    linkCount[l.fromId] = (linkCount[l.fromId] ?? 0) + 1;
-    linkCount[l.toId] = (linkCount[l.toId] ?? 0) + 1;
-  }
+  const linkCount = useMemo(() => {
+    const count = {};
+    for (const l of links) {
+      count[l.fromId] = (count[l.fromId] ?? 0) + 1;
+      count[l.toId] = (count[l.toId] ?? 0) + 1;
+    }
+    return count;
+  }, [links]);
 
   // "Seguir o fio": passar o mouse num post-it acende os fios dele e apaga os outros.
   // Feito direto nas classes (sem redesenhar o mural a cada movimento do mouse).
@@ -1194,12 +1244,76 @@ export default function BoardPage() {
     .filter(Boolean)
     .join(' ');
 
+  const noteFns = useStableHandlers({
+    onMove: handleMove,
+    onResize: handleResize,
+    onEdit: openEdit,
+    onDelete: handleDelete,
+    onFocus: handleFocus,
+    onPin: handlePin,
+    onArchive: handleArchive,
+    onDuplicate: handleDuplicate,
+    onToggleCheck: handleToggleCheck,
+    onTagClick: (t) => setTagFilter((cur) => (cur === t ? null : t)),
+    onSelect: toggleSelect,
+    onDragStart: handleDragStart,
+    onDrop: handleDrop,
+    onLinkStart: startLink,
+    onLinkTarget: handleLinkTarget,
+  });
+
+  // A lista de post-its só se refaz quando algo dela muda (post-its, seleção, zoom, fios...). Abrir uma
+  // janela, um aviso ou um toast não toca nela: antes, cada atualização da tela fazia a biblioteca de
+  // animação avisar os 200 post-its, que se re-mediam (no celular, 280 ms travado ao abrir uma janela).
+  const linkMode = Boolean(linking) && !linking.drag;
+  const quietEntry = notes.length > QUIET_ENTRY;
+  const notesList = useMemo(
+    () => (
+      <AnimatePresence>
+        {shownNotes.map((note, i) => (
+          <PostIt
+            key={note.id}
+            note={note}
+            grid={gridMode}
+            index={i}
+            zoom={z}
+            calm={calm}
+            found={foundId === note.id}
+            selecting={selecting}
+            selected={selection?.has(note.id) ?? false}
+            arranging={arranging}
+            onMove={noteFns.onMove}
+            onResize={noteFns.onResize}
+            onEdit={noteFns.onEdit}
+            onDelete={noteFns.onDelete}
+            onFocus={noteFns.onFocus}
+            onPin={noteFns.onPin}
+            onArchive={noteFns.onArchive}
+            onDuplicate={noteFns.onDuplicate}
+            onToggleCheck={noteFns.onToggleCheck}
+            onTagClick={noteFns.onTagClick}
+            onSelect={noteFns.onSelect}
+            onDragStart={noteFns.onDragStart}
+            onDrop={noteFns.onDrop}
+            onDragMove={gridMode ? undefined : handleDragMove}
+            linkMode={linkMode}
+            onLinkStart={gridMode ? undefined : noteFns.onLinkStart}
+            onLinkTarget={noteFns.onLinkTarget}
+            linkCount={gridMode ? linkCount[note.id] ?? 0 : 0}
+            quiet={quietEntry}
+          />
+        ))}
+      </AnimatePresence>
+    ),
+    [shownNotes, gridMode, z, calm, foundId, selection, arranging, linkMode, linkCount, quietEntry, noteFns, handleDragMove],
+  );
+
   return (
     <main className={boardClass} ref={boardRef}>
       {!scene && <div className="stars" />}
-      <WeatherBackground scene={scene} isDay={isDay} intensity={settings.effectsIntensity} calm={calm} />
+      <WeatherBackground scene={scene} isDay={isDay} intensity={settings.effectsIntensity} calm={calm} lite={perf.lite} />
       <div className="bg-dim" style={{ opacity: settings.bgDim / 100 }} />
-      {!calm && <div className="spotlight" />}
+      {!calm && !perf.lite && <div className="spotlight" ref={spotRef} />}
       <div className="warm-filter" style={{ opacity: WARM_ALPHA[settings.warmFilter] ?? 0 }} />
 
       {/* títulos para o leitor de tela navegar (atalho H); na tela, o nome da pasta já aparece no seletor */}
@@ -1295,13 +1409,13 @@ export default function BoardPage() {
           transition={{ duration: 0.25 }}
         >
           <div ref={layerRef} className={gridMode ? 'canvas-inner-grid' : 'canvas-zoom'} style={zoomStyle}>
-            {!gridMode && showSubjects && <SubjectZones notes={visibleNotes} sizes={sizes} drag={liveDrag} onPick={(t) => setTagFilter(t)} />}
+            {!gridMode && showSubjects && <SubjectZones notes={visibleNotes} sizes={sizes} liveDrag={liveDrag} onPick={(t) => setTagFilter(t)} />}
             {!gridMode && (
               <LinksLayer
                 links={links}
                 notes={visibleNotes}
                 sizes={sizes}
-                drag={liveDrag}
+                liveDrag={liveDrag}
                 preview={linking?.to ? { from: linking.from, to: linking.to } : null}
                 onRemove={removeLink}
                 onColor={recolorLink}
@@ -1309,42 +1423,8 @@ export default function BoardPage() {
                 zoom={z}
               />
             )}
-            <AnimatePresence>
-              {shownNotes.map((note, i) => (
-                <PostIt
-                  key={note.id}
-                  note={note}
-                  grid={gridMode}
-                  index={i}
-                  zoom={z}
-                  calm={calm}
-                  found={foundId === note.id}
-                  selecting={selecting}
-                  selected={selection?.has(note.id) ?? false}
-                  arranging={arranging}
-                  onMove={handleMove}
-                  onResize={handleResize}
-                  onEdit={openEdit}
-                  onDelete={handleDelete}
-                  onFocus={handleFocus}
-                  onPin={handlePin}
-                  onArchive={handleArchive}
-                  onDuplicate={handleDuplicate}
-                  onToggleCheck={handleToggleCheck}
-                  onTagClick={(t) => setTagFilter((cur) => (cur === t ? null : t))}
-                  onSelect={toggleSelect}
-                  onDragStart={handleDragStart}
-                  onDrop={handleDrop}
-                  onDragMove={gridMode ? undefined : handleDragMove}
-                  linkMode={Boolean(linking) && !linking.drag}
-                  onLinkStart={gridMode ? undefined : startLink}
-                  onLinkTarget={handleLinkTarget}
-                  linkCount={gridMode ? linkCount[note.id] ?? 0 : 0}
-                  quiet={notes.length > QUIET_ENTRY}
-                />
-              ))}
-            </AnimatePresence>
-            {!gridMode && settings.linkStyle !== 'arrow' && <PinsLayer links={links} notes={visibleNotes} sizes={sizes} drag={liveDrag} />}
+            {notesList}
+            {!gridMode && settings.linkStyle !== 'arrow' && <PinsLayer links={links} notes={visibleNotes} sizes={sizes} liveDrag={liveDrag} />}
             {liveEnabled && !gridMode && <LiveCursors cursors={live.cursors} />}
           </div>
         </motion.div>
@@ -1411,7 +1491,7 @@ export default function BoardPage() {
             key="minimap"
             notes={visibleNotes}
             sizes={sizes}
-            drag={liveDrag}
+            liveDrag={liveDrag}
             boardRef={boardRef}
             board={boardApi}
             boardTop={BOARD_TOP}
@@ -1611,6 +1691,7 @@ export default function BoardPage() {
         weather={weather}
         autoCalm={autoCalm}
         onSnoozeAutoCalm={handleSnoozeAutoCalm}
+        perf={perf}
         toast={toast}
         onAuthError={handleAuthError}
         onImported={refreshAll}

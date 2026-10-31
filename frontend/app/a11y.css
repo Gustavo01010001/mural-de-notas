@@ -28,7 +28,7 @@ html.theme-light .stars {
 }
 
 html.theme-light .spotlight {
-  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 196, 0, 0.1), transparent 60%);
+  background: radial-gradient(600px circle at center, rgba(255, 196, 0, 0.1), transparent 60%);
 }
 
 html.theme-light .scene-bg {

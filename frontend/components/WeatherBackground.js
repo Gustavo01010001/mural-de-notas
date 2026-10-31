@@ -345,7 +345,8 @@ function drawMotes(ctx, motes, t, dt, w, h, color) {
   ctx.globalAlpha = 1;
 }
 
-function SceneCanvas({ scene, isDay, intensity, calm }) {
+// lite (modo leve): metade das partículas, resolução 1:1 e 30 quadros por segundo — a mesma cena, bem mais barata
+function SceneCanvas({ scene, isDay, intensity, calm, lite }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -359,7 +360,7 @@ function SceneCanvas({ scene, isDay, intensity, calm }) {
     let last = performance.now();
 
     function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = lite ? 1 : Math.min(window.devicePixelRatio || 1, 2);
       w = window.innerWidth;
       h = window.innerHeight;
       canvas.width = w * dpr;
@@ -367,7 +368,7 @@ function SceneCanvas({ scene, isDay, intensity, calm }) {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const k = (INTENSITY[intensity] ?? 1) * (reduced ? 0.4 : 1) * (calm ? 0.35 : 1);
+      const k = (INTENSITY[intensity] ?? 1) * (reduced ? 0.4 : 1) * (calm ? 0.35 : 1) * (lite ? 0.5 : 1);
       state = createScene(scene, isDay, w, h, k);
       state.calm = calm;
     }
@@ -375,11 +376,13 @@ function SceneCanvas({ scene, isDay, intensity, calm }) {
     // Modo confortável: tudo continua se mexendo, só que mais devagar
     const speed = (reduced ? 0.3 : 1) * (calm ? 0.55 : 1);
 
+    const minGap = lite ? 1000 / 30 - 2 : 0;
     function loop(now) {
+      raf = requestAnimationFrame(loop);
+      if (now - last < minGap) return; // modo leve: pula quadros alternados
       const dt = Math.min(0.05, (now - last) / 1000) * speed;
       last = now;
       step(ctx, state, dt, w, h);
-      raf = requestAnimationFrame(loop);
     }
 
     // Pausa quando a aba não está visível (economiza bateria)
@@ -400,12 +403,12 @@ function SceneCanvas({ scene, isDay, intensity, calm }) {
       window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [scene, isDay, intensity, calm]);
+  }, [scene, isDay, intensity, calm, lite]);
 
   return <canvas ref={canvasRef} />;
 }
 
-export default function WeatherBackground({ scene, isDay = true, intensity = 'medium', calm = false }) {
+export default function WeatherBackground({ scene, isDay = true, intensity = 'medium', calm = false, lite = false }) {
   return (
     <AnimatePresence>
       {scene && (
@@ -418,7 +421,7 @@ export default function WeatherBackground({ scene, isDay = true, intensity = 'me
           transition={{ duration: 1.2 }}
           aria-hidden
         >
-          <SceneCanvas scene={scene} isDay={isDay} intensity={intensity} calm={calm} />
+          <SceneCanvas scene={scene} isDay={isDay} intensity={intensity} calm={calm} lite={lite} />
         </motion.div>
       )}
     </AnimatePresence>

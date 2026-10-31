@@ -40,6 +40,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
   const space = useRef(false);
   const gesturing = useRef(false);
   const movingTimer = useRef(null);
+  const room = useRef(null); // tamanho do mural (px) aplicado durante o gesto de zoom
 
   size.current = contentSize;
   // estado do React mudou (botões, carregar): segue ele, a não ser no meio de um gesto
@@ -83,12 +84,19 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       const bx = (board.scrollLeft + px) / prev;
       const by = (board.scrollTop + py - boardTop) / prev;
       const { w, h } = size.current;
-      const st = boardStyles(w, h, next, boardTop);
-      layer.style.transform = st.layer.transform ?? '';
-      layer.style.width = st.layer.width;
-      layer.style.height = st.layer.height;
-      canvas.style.width = st.canvas.width;
-      canvas.style.height = st.canvas.height;
+      layer.style.transform = next === 1 ? '' : `scale(${next})`;
+      // Durante o gesto só a escala muda: a placa de vídeo amplia o que já está desenhado, sem redesenhar
+      // os post-its (mudar também o tamanho do mural a cada giro da roda custava metade dos quadros).
+      // O mural só cresce quando falta espaço para rolar (com folga, raramente); o tamanho exato é
+      // acertado no fim do gesto (fitRoom).
+      room.current ??= { w: canvas.offsetWidth, h: canvas.offsetHeight };
+      const needW = w * next + board.clientWidth;
+      const needH = h * next + boardTop + board.clientHeight;
+      if (needW > room.current.w || needH > room.current.h) {
+        room.current = { w: Math.ceil(Math.max(needW, room.current.w) * 1.25), h: Math.ceil(Math.max(needH, room.current.h) * 1.25) };
+        canvas.style.width = `${room.current.w}px`;
+        canvas.style.height = `${room.current.h}px`;
+      }
       z.current = next;
       board.scrollLeft = bx * next - px;
       board.scrollTop = by * next + boardTop - py;
@@ -97,14 +105,28 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
     [boardRef, canvasRef, layerRef, boardTop, notify],
   );
 
+  // Fim do gesto: o mural volta ao tamanho exato do zoom atual (o mesmo que o React vai desenhar)
+  const fitRoom = useCallback(() => {
+    const canvas = canvasRef.current;
+    const layer = layerRef.current;
+    room.current = null;
+    if (!canvas || !layer) return;
+    const st = boardStyles(size.current.w, size.current.h, z.current, boardTop);
+    layer.style.width = st.layer.width;
+    layer.style.height = st.layer.height;
+    canvas.style.width = st.canvas.width;
+    canvas.style.height = st.canvas.height;
+  }, [canvasRef, layerRef, boardTop]);
+
   const scheduleCommit = useCallback(() => {
     gesturing.current = true;
     clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(() => {
       gesturing.current = false;
+      fitRoom();
       onZoomCommit(Math.round(z.current * 100) / 100);
     }, COMMIT_DELAY);
-  }, [onZoomCommit]);
+  }, [onZoomCommit, fitRoom]);
 
   const stopMotion = useCallback(() => {
     cancelAnimationFrame(anim.current);

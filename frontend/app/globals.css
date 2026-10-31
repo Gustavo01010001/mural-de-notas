@@ -81,11 +81,17 @@ a {
   }
 }
 
+/* brilho que segue o mouse: um círculo de 1200 px centrado no cursor, movido por transform (sem repintar) */
 .spotlight {
   position: fixed;
-  inset: 0;
+  left: -600px;
+  top: -600px;
+  width: 1200px;
+  height: 1200px;
   pointer-events: none;
-  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 216, 77, 0.07), transparent 60%);
+  transform: translate3d(50vw, 50vh, 0);
+  will-change: transform;
+  background: radial-gradient(600px circle at center, rgba(255, 216, 77, 0.07), transparent 60%);
 }
 
 /* ============ Mural ============ */
@@ -228,7 +234,8 @@ a {
   background: rgba(255, 255, 255, 0.45);
   border-left: 2px dashed rgba(255, 255, 255, 0.4);
   border-right: 2px dashed rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(2px);
+  /* sem vidro fosco: o desfoque de 2 px nem aparece e, em cada um dos post-its, era o efeito mais caro
+     da tela (rolagem 10 → 32 fps com 200 post-its) */
 }
 
 .postit-title {

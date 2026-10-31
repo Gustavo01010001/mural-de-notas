@@ -18,6 +18,8 @@ function lanIPs() {
 }
 
 const app = express();
+// Não anuncia "X-Powered-By: Express" (facilitaria procurar falhas conhecidas da versão)
+app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 4000;
 // Por padrão a API só aceita conexões do próprio PC: o navegador (PC ou celular)
 // fala com o front, e o Next repassa /api para cá. Use HOST=0.0.0.0 para expor na rede.
@@ -28,6 +30,18 @@ const FRONT_URL = process.env.FRONT_URL || 'https://localhost:3000';
 // ou front aberto pelo IP da rede local, em http ou https
 const allowed = FRONT_URL.split(',').map((s) => s.trim());
 const LAN_FRONT = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):3000$/;
+// Cabeçalhos de segurança da API (só responde JSON e imagens: nada precisa rodar script nem ser embutido)
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; img-src 'self'; frame-ancestors 'none'",
+    'Cross-Origin-Resource-Policy': 'same-site',
+  });
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, done) => done(null, !origin || allowed.includes(origin) || LAN_FRONT.test(origin)),

@@ -9,6 +9,10 @@ export function errorHandler(err, _req, res, _next) {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'JSON inválido.' });
   }
+  // corpo maior que o limite (ex.: texto de vários MB): recusa educada, não "erro interno"
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Conteúdo grande demais. Diminua o texto ou a foto e tente de novo.' });
+  }
   const status = err instanceof HttpError ? err.status : 500;
   if (status === 500) console.error(err);
   res.status(status).json({ error: status === 500 ? 'Erro interno no servidor.' : err.message, ...(status === 500 ? {} : err.details ?? {}) });

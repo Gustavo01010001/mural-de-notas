@@ -7,12 +7,12 @@ testes automáticos, segurança, funcional ponta a ponta, celular, desempenho e 
 
 | Frente | Resultado |
 |---|---|
-| Testes automáticos do back | ✅ **81/81** em 8,9 s |
+| Testes automáticos do back | ✅ **83/83** (2 novos de segurança) |
 | Compilação do front | ✅ sem erros (5 rotas) |
-| Bibliotecas com vulnerabilidade | ⚠️ back: **1 alta** (nodemailer) · front: 0 |
-| Segurança (24 sondagens) | ✅ 16 · ❌ 8 (7 são cabeçalhos ausentes) |
+| Bibliotecas com vulnerabilidade | ✅ **corrigido** — back: 0 (nodemailer 10.3.1) · front: 0 |
+| Segurança (24 sondagens) | ✅ **23/24** (era 16) — o que falta é HSTS, que só vale em produção (e lá está) |
 | Funcional ponta a ponta (PC) | ✅ **todos os 22 passos** |
-| Celular 375 px | ✅ fluxos ok · ⚠️ alvos de toque pequenos |
+| Celular 375 px | ✅ fluxos ok · ✅ alvos de toque ≥ 44 px |
 | Desempenho com 201 post-its | ✅ **corrigido** — parado 60 fps, zoom 44 fps, rolagem 38 fps (era 16 / 12 / 18) |
 | Acessibilidade automática | ✅ nomes, rótulos, idioma, "reduzir movimento" · ⚠️ foco fraco, sem títulos |
 
@@ -21,14 +21,14 @@ testes automáticos, segurança, funcional ponta a ponta, celular, desempenho e 
 | # | Gravidade | Achado | Evidência | Como resolver |
 |---|---|---|---|---|
 | Q1 | ✅ **Corrigido** | **Mural pesado com muitos post-its.** Com 201 post-its: parado 27–31 fps, zoom 17 fps, rolagem 14 fps, 20 travadas na rolagem. | Experimento: tirar o "respirar" dos post-its sobe de 31 → **50 fps**; sem nenhuma animação, 57 fps. 246 animações CSS rodando ao mesmo tempo. | Animar só os post-its **visíveis na tela** (IntersectionObserver), pausar animações durante zoom/rolagem e desligar o "respirar" acima de ~40 post-its. |
-| Q2 | 🟠 Alta | **Biblioteca `nodemailer` vulnerável** (versão 6): 20+ alertas, incluindo injeção de comando SMTP e e-mail indo para domínio errado. | `npm audit` no back. Risco atual **baixo**: o e-mail de "esqueci a senha" não está ligado nem configurado. | Atualizar para a versão corrigida (`npm i nodemailer@latest`) e rodar os testes. |
-| Q3 | 🟠 Média | **Faltam cabeçalhos de segurança** no front e no back: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`. | Sondagem direta. | Adicionar `headers()` no `next.config.mjs` e um middleware no Express (ou `helmet`). Protege contra clickjacking e alguns ataques de script. |
-| Q4 | 🟠 Média | **Texto grande demais dá erro 500** em vez de recusar educadamente (413). | Corpo de 3 MB → 500; log: `PayloadTooLargeError` (`entity.too.large`). | Tratar `err.type === 'entity.too.large'` no `errorHandler` → 413 "Texto grande demais". |
-| Q5 | 🟠 Média | **Alvos de toque pequenos no celular** (mínimo recomendado 44×44 px). | Bolinhas de cor do post-it **20×20**, "Expandir clima" **24×24**, botões do formulário 26–33 px de altura, topo 40×40. | Área de toque invisível de 44 px em volta (como já foi feito no ⋯ do post-it). |
+| Q2 | ✅ **Corrigido** | **Biblioteca `nodemailer` vulnerável** (versão 6): 20+ alertas, incluindo injeção de comando SMTP e e-mail indo para domínio errado. | `npm audit` no back. Risco atual **baixo**: o e-mail de "esqueci a senha" não está ligado nem configurado. | Atualizar para a versão corrigida (`npm i nodemailer@latest`) e rodar os testes. |
+| Q3 | ✅ **Corrigido** | **Faltam cabeçalhos de segurança** no front e no back: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`. | Sondagem direta. | Adicionar `headers()` no `next.config.mjs` e um middleware no Express (ou `helmet`). Protege contra clickjacking e alguns ataques de script. |
+| Q4 | ✅ **Corrigido** | **Texto grande demais dá erro 500** em vez de recusar educadamente (413). | Corpo de 3 MB → 500; log: `PayloadTooLargeError` (`entity.too.large`). | Tratar `err.type === 'entity.too.large'` no `errorHandler` → 413 "Texto grande demais". |
+| Q5 | ✅ **Corrigido** | **Alvos de toque pequenos no celular** (mínimo recomendado 44×44 px). | Bolinhas de cor do post-it **20×20**, "Expandir clima" **24×24**, botões do formulário 26–33 px de altura, topo 40×40. | Área de toque invisível de 44 px em volta (como já foi feito no ⋯ do post-it). |
 | Q6 | 🟡 Baixa | **Demora para mostrar 201 post-its** (~6,5 s até todos aparecerem). | API responde em **57 ms**; o tempo é montagem + animação de entrada de 201 post-its no modo de desenvolvimento. | Medir no build de produção; animar a entrada só dos visíveis; virtualizar quem está muito fora da tela. |
 | Q7 | 🟡 Baixa | **Contorno de foco do teclado fraco** (pendência I10 do relatório de usuário novo). | Botão + sem contorno visível ao focar. | Contorno amarelo de 3 px em `:focus-visible` para todos os botões. |
 | Q8 | 🟡 Baixa | **Mural sem títulos de seção (h1/h2)** para leitor de tela navegar. | Nenhum `h1`/`h2` na tela principal. | Um `h1` visualmente escondido ("Mural — pasta X") e `h2` nos painéis. |
-| Q9 | 🟡 Baixa | Servidores **se anunciam** (`X-Powered-By: Express` / `Next.js`). | Sondagem. | `app.disable('x-powered-by')` e `poweredByHeader: false`. |
+| Q9 | ✅ **Corrigido** | Servidores **se anunciam** (`X-Powered-By: Express` / `Next.js`). | Sondagem. | `app.disable('x-powered-by')` e `poweredByHeader: false`. |
 | Q10 | 💡 Sugestão | Data **no começo do mês seguinte** não aparece ao abrir o calendário (ele abre no mês atual). | Prova em 01/11 vista só depois de clicar "próximo mês". | Dica no calendário: "📅 1 data no próximo mês →". |
 
 ## ✅ O que passou
@@ -113,3 +113,22 @@ Medido no **build de produção**, 201 post-its e 59 fios, 1366×768, comparaç�
 59 fios desenhados · menu ⋯ abre inteiro · texto fora da tela continua acessível (leitor de tela / busca) ·
 nenhum erro no console. Ideias descartadas pelo próprio teste: tirar a sombra durante o movimento
 (**piorou**: 38 → 12 fps) e `content-visibility: hidden` (rápido, mas esconde o texto de leitores de tela).
+
+---
+
+## ✅ Q2, Q3, Q4, Q5 e Q9 corrigidos — segurança e toque no celular (31/10/2026)
+
+| # | O que mudou | Prova |
+|---|---|---|
+| Q2 | `nodemailer` 6 → **10.3.1** | `npm audit`: **0 vulnerabilidades**; montagem de um e-mail de teste ok; 83/83 testes |
+| Q3 | **Front** (`next.config.mjs` → `headers()`): `Content-Security-Policy` (só o próprio site carrega scripts, estilos, imagens, fontes e conexões; ninguém embute o mural em `<iframe>`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` (localização só para o clima; câmera/microfone nunca) e **HSTS só em produção**. **Back** (Express): os mesmos cabeçalhos, com CSP `default-src 'none'` (a API só devolve JSON e imagens) | Sondagens: **23/24** (era 16/24). No build de produção: HSTS presente e CSP sem `unsafe-eval`/`ws:`. No navegador: **nenhum bloqueio** de CSP — post-its, foto (blob), clima, busca, calendário e configurações funcionando |
+| Q4 | `errorHandler`: `entity.too.large` → **413** "Conteúdo grande demais. Diminua o texto ou a foto e tente de novo." | Teste automático novo: corpo de 3 MB → 413 |
+| Q5 | No celular (`pointer: coarse` ou até 720 px): bolinhas de cor 32 px com área de toque invisível de **48 px**; "Expandir clima" com área de **44 px**; botões, campos e chips da janela do post-it com **44 px** de altura; botões do topo 44×44 | Medido em 375 px: bolinha 48×48 · clima 44×44 · Checklist/Etiqueta/Foto/Data/Cancelar/Colar 44 px · engrenagem 44×44 · sem rolagem lateral |
+| Q9 | `app.disable('x-powered-by')` e `poweredByHeader: false` | Sondagem: nenhum dos dois servidores se anuncia; teste automático confere |
+
+**Por que HSTS só em produção:** no `localhost` ele ficaria gravado no navegador e forçaria https em outros
+projetos do mesmo PC. **Por que CSP sem "nonce":** o modelo com nonce obriga todas as páginas a serem geradas
+na hora (sem cache); o modelo sem nonce da documentação do Next já bloqueia scripts e iframes de fora.
+
+**Ainda abertos (baixa prioridade):** Q6 (demora para mostrar 201 post-its), Q7 (contorno de foco),
+Q8 (títulos para leitor de tela), Q10 (aviso de data no mês seguinte).

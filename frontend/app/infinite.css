@@ -609,3 +609,60 @@ html.theme-light .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .
 .canvas.free .postit.offscreen {
   content-visibility: auto;
 }
+
+/* =====================================================================
+   Alvos de toque de 44 px no celular (QA — Q5; WCAG 2.5.5)
+   O desenho continua delicado; a área de toque cresce com uma "auréola" invisível.
+   ===================================================================== */
+@media (pointer: coarse), (max-width: 720px) {
+  /* bolinhas de cor do post-it: 20 → 32 px de desenho + área de 44 px */
+  .color-row {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .note-modal .color-dot {
+    position: relative;
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0;
+  }
+
+  .note-modal .color-dot::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+  }
+
+  /* "+"/"−" do clima: 24 px de desenho, 44 de toque */
+  .weather-toggle::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+  }
+
+  /* botões do formulário do post-it e chips de "Adicionar" */
+  .note-modal .modal-buttons button,
+  .note-modal .extra-chip,
+  .note-modal .related-list .btn-small,
+  .note-modal .check-add input,
+  .note-modal .tag-edit input,
+  .note-modal select {
+    min-height: 44px;
+  }
+
+  .note-modal .icon-mini {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* barra do topo: 40 → 44 px */
+  .topbar .gear-btn,
+  .topbar .folder-trigger,
+  .topbar .presence-bar {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

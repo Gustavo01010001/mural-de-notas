@@ -1409,3 +1409,21 @@ describe('Quadro de detetive: cor dos fios, posições em lote e estilo', () => 
     assert.equal((await call('/settings', { method: 'PUT', token: u.token, body: { linkStyle: 'laser' } })).status, 400);
   });
 });
+
+describe('Segurança da API (relatório de qualidade)', () => {
+  test('cabeçalhos de segurança e sem X-Powered-By', async () => {
+    const r = await fetch(`${BASE}/health`);
+    assert.equal(r.headers.get('x-powered-by'), null);
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('x-frame-options'), 'DENY');
+    assert.match(r.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+  });
+
+  test('conteúdo grande demais é recusado com 413 (não 500)', async () => {
+    const u = await newUser('Grandão');
+    const r = await call('/notes', { method: 'POST', token: u.token, body: { title: 'a', content: 'y'.repeat(3_000_000) } });
+    assert.equal(r.status, 413);
+    assert.match(r.data.error, /grande demais/);
+  });
+});

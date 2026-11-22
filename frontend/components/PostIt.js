@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { countdownLabel, eventIcon, formatEventDate, googleCalendarUrl, repeatLabel } from '@/lib/format';
 import { linkify, tagColor } from '@/lib/noteHelpers';
@@ -78,6 +78,7 @@ function PostIt({
   const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const drag = useRef(null);
+  const elRef = useRef(null);
   const resize = useRef(null);
   const menuRef = useRef(null);
   const justDragged = useRef(false); // o clique que vem logo depois de arrastar não abre a edição
@@ -86,6 +87,10 @@ function PostIt({
   useEffect(() => {
     if (!drag.current) setPos({ x: note.x, y: note.y });
   }, [note.x, note.y]);
+  // soltou: no mesmo quadro em que left/top recebem o lugar novo, o deslocamento do arraste é zerado (sem pulo)
+  useLayoutEffect(() => {
+    if (!drag.current && elRef.current) elRef.current.style.translate = '';
+  }, [pos.x, pos.y]);
   useEffect(() => {
     if (!resize.current) setSize({ width: note.width, height: note.height });
   }, [note.width, note.height]);
@@ -114,9 +119,13 @@ function PostIt({
     onFocus(note.id);
   }
 
+  // Enquanto arrasta, o post-it anda por "translate" direto no elemento: a placa de vídeo move a camada dele
+  // sem redesenhar a página. Antes, mudar left/top a cada movimento refazia o post-it no React e obrigava o
+  // navegador a reorganizar as camadas da tela inteira (o que mais travava num aparelho fraco).
+  // A posição de verdade (left/top) só é gravada ao soltar.
   function follow(d) {
     const p = dragPos(d);
-    setPos(p);
+    if (elRef.current) elRef.current.style.translate = `${p.x - d.ox}px ${p.y - d.oy}px`;
     onDragMove?.(note.id, p);
   }
 
@@ -157,14 +166,16 @@ function PostIt({
     setDragging(false);
     onDragMove?.(note.id, null);
     if (d?.moved && onDrop?.(note, e.clientX, e.clientY)) {
-      // soltou em cima de uma pasta: o post-it vai para lá (não salva posição aqui)
-      setPos({ x: d.ox, y: d.oy });
+      // soltou em cima de uma pasta: o post-it vai para lá (não salva posição aqui) e volta ao lugar
+      if (elRef.current) elRef.current.style.translate = '';
       return;
     }
     if (d?.moved) {
       d.cx = e.clientX;
       d.cy = e.clientY;
-      onMove(note.id, dragPos(d));
+      const p = dragPos(d);
+      setPos(p);
+      onMove(note.id, p);
     }
   }
 
@@ -260,9 +271,15 @@ function PostIt({
 
   return (
     <motion.div
+      ref={elRef}
       className={className}
       data-note-id={note.id}
       {...motionProps}
+      // foco pelo teclado: o TAB para no post-it (os botões dele aparecem) e o Enter abre a edição
+      tabIndex={0}
+      role="group"
+      aria-labelledby={`postit-title-${note.id}`}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && !selecting && onEdit(note)}
       onClick={handleClick}
       onDoubleClick={(e) => !e.target.closest(INTERACTIVE) && !selecting && onEdit(note)}
     >
@@ -356,7 +373,9 @@ function PostIt({
         </div>
       )}
 
-      <h3 className="postit-title">{note.title}</h3>
+      <h3 className="postit-title" id={`postit-title-${note.id}`}>
+        {note.title}
+      </h3>
       {note.hasImage && <NoteImage note={note} />}
       {note.content && (
         <p className="postit-content">

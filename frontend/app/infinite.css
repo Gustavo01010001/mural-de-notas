@@ -594,7 +594,6 @@ html.theme-light .minimap-canvas rect:not(.minimap-view) {
    durante o movimento vira um fundo sólido quase igual; quando o mural para, o vidro volta */
 .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .weather, .upcoming, .zoom-control, .tool-btn, .focus-timer, .minimap, .brand) {
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
@@ -605,17 +604,10 @@ html.theme-light .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .
   background-color: rgba(255, 255, 255, 0.96) !important;
 }
 
-/* fora da tela, o navegador nem desenha o conteúdo do post-it (rolagem 20 → 51 fps com 201 post-its).
-   Só nos .offscreen: esse recurso corta o que passa da borda (fita, menu ⋯, bolinha), e os visíveis precisam disso.
-   contain-intrinsic-size "auto" faz o navegador lembrar o tamanho real — fios, minimapa e mapa de ideias não mudam.
-   Com "auto" (e não "hidden") o texto continua acessível a leitor de tela e à busca da página. */
-.canvas.free .postit {
-  contain-intrinsic-size: auto 230px auto 210px;
-}
-
-.canvas.free .postit.offscreen {
-  content-visibility: auto;
-}
+/* (Removido) content-visibility nos post-its fora da tela: com as otimizações seguintes ele passou a
+   atrapalhar — o Chrome criava uma camada da placa de vídeo para cada pedaço dos post-its visíveis (174
+   camadas com 200 post-its; sem ele, 16), o que pesava a cada quadro e gastava memória de vídeo, ruim
+   para celular com pouca memória. Medido: zoom 37 → 44 fps no PC, resto igual. */
 
 /* =====================================================================
    Alvos de toque de 44 px no celular (QA — Q5; WCAG 2.5.5)
@@ -684,7 +676,6 @@ html.lite *,
 html.lite *::before,
 html.lite *::after {
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 /* sem o desfoque, o "vidro" quase transparente vira um fundo sólido quase igual */
@@ -733,4 +724,94 @@ html.lite .postit.is-today {
   box-shadow:
     0 0 0 3px rgba(255, 216, 77, 0.75),
     0 6px 16px rgba(255, 216, 77, 0.35);
+}
+
+/* =====================================================================
+   60 fps com muitos post-its
+   ===================================================================== */
+/* Botões que só aparecem ao passar o mouse (✎, 📌, ⋯ e a bolinha do fio): escondidos com opacidade eles
+   continuavam sendo desenhados nos 200 post-its a cada quadro. Com visibility o navegador nem desenha
+   (rolagem 41 → 57 fps, zoom 35 → 48). Voltam ao passar o mouse, com foco de teclado no post-it ou num
+   botão dele (TAB — clicar com o mouse não deixa os botões presos na tela), com o menu aberto e sempre no
+   toque. */
+.postit-actions {
+  visibility: hidden;
+  transition:
+    opacity 0.2s,
+    transform 0.2s,
+    visibility 0s linear 0.2s;
+}
+
+.postit:hover .postit-actions,
+.postit:has(:focus-visible) .postit-actions,
+.postit:focus-visible .postit-actions,
+.postit-actions.open {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.postit:has(:focus-visible) .postit-actions,
+.postit:focus-visible .postit-actions {
+  opacity: 1;
+  transform: none;
+}
+
+.link-handle {
+  visibility: hidden;
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    visibility 0s linear 0.15s;
+}
+
+.postit:hover .link-handle {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (hover: none) {
+  .postit-actions {
+    visibility: visible;
+  }
+}
+
+/* Zoom afastado (menos de 50%): o texto vira um risco ilegível, mas custava desenhar letra por letra nos
+   200 post-its. Ficam a cor e o título (o tamanho do papel não muda: fios e minimapa continuam certos).
+   Ligado só quando o zoom assenta, nunca no meio do gesto. */
+.board.far .canvas-zoom .postit :is(.postit-content, .postit-checklist, .postit-tags, .postit-image, .postit-event) {
+  visibility: hidden;
+}
+
+/* Ícone do clima: animação dentro de desenho vetorial (SVG) não roda na placa de vídeo; enquanto ela gira,
+   o navegador refaz a página a cada quadro. Pausa enquanto o mural se mexe e, no modo leve, fica parado
+   (o ícone continua mostrando o tempo certo). Mesmo para os dois-pontos do relógio e o brilho do cartão. */
+.weather-icon {
+  animation: weather-bob 4s ease-in-out infinite;
+}
+
+@keyframes weather-bob {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.board.is-moving :is(.weather-icon, .weather-icon *, .clock-sep),
+.board.is-moving .weather::before {
+  animation-play-state: paused !important;
+}
+
+html.lite :is(.weather-icon, .weather-icon *, .clock-sep),
+html.lite .weather::before {
+  animation: none !important;
+}
+
+/* Previsão dos próximos dias: ícones parados (só o principal se mexe). Cinco tempestades animadas ao mesmo
+   tempo poluíam a tela e, por serem desenho vetorial, faziam o navegador refazer a página a cada quadro. */
+.forecast-icon * {
+  animation: none !important;
+}
+
+/* post-it sendo arrastado: camada própria da placa de vídeo (ele anda por "translate", sem redesenhar a página) */
+.postit.is-dragging {
+  will-change: transform, translate;
 }

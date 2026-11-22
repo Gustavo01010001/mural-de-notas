@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { api, clearSession, hasSession, migrateLegacyToken } from '@/lib/api';
 import { alertHeadline, countdownLabel, eventIcon } from '@/lib/format';
 import { tagColor } from '@/lib/noteHelpers';
@@ -39,6 +39,8 @@ const BOARD_TOP = 76;
 const MANY_VISIBLE = 40;
 // Pasta com muitos post-its: eles aparecem direto, sem a animação de "cair" um por um
 const QUIET_ENTRY = 40;
+// Abaixo deste zoom o texto dos post-its fica ilegível: o mural mostra só cor e título (bem mais leve)
+const FAR_ZOOM = 0.5;
 const MINIMAP_KEY = 'mural_minimap';
 const SUBJECTS_KEY = 'mural_subjects';
 
@@ -1244,6 +1246,19 @@ export default function BoardPage() {
     .filter(Boolean)
     .join(' ');
 
+  // Zoom afastado: o mural mostra só cor e título dos post-its (classe "far", ver infinite.css). Direto na
+  // classe, como "many-notes" e "is-moving", e reaplicada se o React reescrever as classes do mural.
+  useEffect(() => {
+    boardRef.current?.classList.toggle('far', !gridMode && z < FAR_ZOOM);
+  }, [z, gridMode, boardClass]);
+
+  const overlayFns = useStableHandlers({
+    onRemoveLink: removeLink,
+    onColorLink: recolorLink,
+    onPickTag: (t) => setTagFilter(t),
+    onCloseMinimap: () => (setShowMinimap(false), savePref(MINIMAP_KEY, false)),
+  });
+
   const noteFns = useStableHandlers({
     onMove: handleMove,
     onResize: handleResize,
@@ -1309,6 +1324,10 @@ export default function BoardPage() {
   );
 
   return (
+    // Modo leve: a biblioteca de animação tira deslocamentos e escalas (molas calculadas no processador) e
+    // mantém os esmaecimentos — abrir janelas e criar post-its fica leve num celular simples. Fora dele,
+    // segue o "reduzir movimento" do sistema.
+    <MotionConfig reducedMotion={perf.lite ? 'always' : 'user'}>
     <main className={boardClass} ref={boardRef}>
       {!scene && <div className="stars" />}
       <WeatherBackground scene={scene} isDay={isDay} intensity={settings.effectsIntensity} calm={calm} lite={perf.lite} />
@@ -1388,6 +1407,7 @@ export default function BoardPage() {
             error={weatherError}
             userName={user?.name}
             settings={settings}
+            lite={perf.lite}
           />
         )}
       </AnimatePresence>
@@ -1409,7 +1429,7 @@ export default function BoardPage() {
           transition={{ duration: 0.25 }}
         >
           <div ref={layerRef} className={gridMode ? 'canvas-inner-grid' : 'canvas-zoom'} style={zoomStyle}>
-            {!gridMode && showSubjects && <SubjectZones notes={visibleNotes} sizes={sizes} liveDrag={liveDrag} onPick={(t) => setTagFilter(t)} />}
+            {!gridMode && showSubjects && <SubjectZones notes={visibleNotes} sizes={sizes} liveDrag={liveDrag} onPick={overlayFns.onPickTag} />}
             {!gridMode && (
               <LinksLayer
                 links={links}
@@ -1417,8 +1437,8 @@ export default function BoardPage() {
                 sizes={sizes}
                 liveDrag={liveDrag}
                 preview={linking?.to ? { from: linking.from, to: linking.to } : null}
-                onRemove={removeLink}
-                onColor={recolorLink}
+                onRemove={overlayFns.onRemoveLink}
+                onColor={overlayFns.onColorLink}
                 style={settings.linkStyle}
                 zoom={z}
               />
@@ -1495,7 +1515,7 @@ export default function BoardPage() {
             boardRef={boardRef}
             board={boardApi}
             boardTop={BOARD_TOP}
-            onClose={() => (setShowMinimap(false), savePref(MINIMAP_KEY, false))}
+            onClose={overlayFns.onCloseMinimap}
           />
         )}
       </AnimatePresence>
@@ -1611,7 +1631,7 @@ export default function BoardPage() {
       )}
 
       <motion.button
-        className="fab"
+        className={`fab ${user && notes.length === 0 ? 'invite' : ''}`}
         onClick={openNew}
         aria-label="Novo post-it"
         initial={{ scale: 0, rotate: -180 }}
@@ -1705,5 +1725,6 @@ export default function BoardPage() {
       />
       <AlertModal alerts={alerts} onDismiss={handleDismiss} calm={calm} />
     </main>
+    </MotionConfig>
   );
 }

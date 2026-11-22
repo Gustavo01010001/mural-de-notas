@@ -25,8 +25,9 @@ export function greeting(hour) {
   return 'Boa noite';
 }
 
-// Relógio com cada dígito "virando" quando muda
-export default function Clock({ timeZone, showSeconds = true, hour12 = false, compact = false, onHour }) {
+// Relógio com cada dígito "virando" quando muda.
+// plain (modo leve): só troca o número — a virada é JavaScript quadro a quadro, a cada segundo
+export default function Clock({ timeZone, showSeconds = true, hour12 = false, compact = false, plain = false, onHour }) {
   const [now, setNow] = useState(null);
 
   useEffect(() => {
@@ -43,6 +44,19 @@ export default function Clock({ timeZone, showSeconds = true, hour12 = false, co
 
   if (!p) return <div className={compact ? 'clock-compact' : 'clock clock-skeleton'} />;
   if (compact) return <div className="clock-compact">{p.time}</div>;
+  if (plain)
+    return (
+      <div className="clock">
+        <div className="clock-time" aria-label={p.time}>
+          {p.time.split('').map((ch, i) => (
+            <span key={i} className={/\d/.test(ch) ? 'clock-digit' : ch === ':' ? 'clock-sep colon' : 'clock-sep'}>
+              {ch === ' ' || ch === ' ' ? ' ' : ch}
+            </span>
+          ))}
+        </div>
+        <div className="clock-date">{p.day}</div>
+      </div>
+    );
 
   return (
     <div className="clock">

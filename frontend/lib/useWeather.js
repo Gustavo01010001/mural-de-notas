@@ -5,6 +5,7 @@ import { api } from './api';
 
 const FALLBACK = { lat: -23.55, lon: -46.63 }; // São Paulo, se o usuário negar a localização
 const REFRESH_MS = 10 * 60 * 1000;
+const RETRY_MS = 30 * 1000;
 
 function getCoords() {
   return new Promise((resolve) => {
@@ -21,16 +22,16 @@ function getCoords() {
 // (usado pelo widget e pelo fundo "Tempo real")
 export function useWeather() {
   const [weather, setWeather] = useState(null);
-  const [error, setError] = useState(false);
+  const [fails, setFails] = useState(0); // falhas seguidas (0 = clima ok)
 
   const load = useCallback(async () => {
     try {
       const { lat, lon, located } = await getCoords();
       const data = await api(`/weather?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
       setWeather({ ...data, located });
-      setError(false);
+      setFails(0);
     } catch {
-      setError(true);
+      setFails((n) => n + 1);
     }
   }, []);
 
@@ -40,5 +41,13 @@ export function useWeather() {
     return () => clearInterval(id);
   }, [load]);
 
-  return { weather, error };
+  // Falhou (serviço do clima demorou, servidor reiniciando): tenta de novo em 30 s em vez de deixar
+  // "Clima indisponível" na tela até a próxima atualização, 10 minutos depois
+  useEffect(() => {
+    if (!fails) return;
+    const t = setTimeout(load, RETRY_MS);
+    return () => clearTimeout(t);
+  }, [fails, load]);
+
+  return { weather, error: fails > 0 };
 }

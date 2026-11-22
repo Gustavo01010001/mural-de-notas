@@ -8,7 +8,7 @@ import WeatherIcon from './WeatherIcon';
 const toUnit = (c, unit) => (c == null ? null : unit === 'F' ? (c * 9) / 5 + 32 : c);
 const weekday = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') : '');
 
-export default function WeatherWidget({ weather, error, userName, settings }) {
+export default function WeatherWidget({ weather, error, userName, settings, lite = false }) {
   const [open, setOpen] = useState(true);
   const [hour, setHour] = useState(null);
 
@@ -23,7 +23,7 @@ export default function WeatherWidget({ weather, error, userName, settings }) {
     return v == null ? '--' : Math.round(v);
   };
   const theme = weather ? `${weather.condition}-${weather.isDay ? 'day' : 'night'}` : 'loading';
-  const clockProps = { timeZone: weather?.timeZone, showSeconds: settings.showSeconds, hour12: !settings.clock24h };
+  const clockProps = { timeZone: weather?.timeZone, showSeconds: settings.showSeconds, hour12: !settings.clock24h, plain: lite };
 
   return (
     <motion.aside
@@ -39,13 +39,11 @@ export default function WeatherWidget({ weather, error, userName, settings }) {
       </button>
 
       <div className="weather-top" onClick={() => !open && setOpen(true)}>
-        <motion.div
-          className="weather-icon"
-          animate={{ y: [0, -5, 0] }}
-          transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-        >
+        {/* flutua por CSS (placa de vídeo); pela biblioteca de animação era JavaScript a cada quadro e, num
+            aparelho fraco, só isso ocupava mais da metade do processador com o mural parado */}
+        <div className="weather-icon">
           {weather ? <WeatherIcon condition={weather.condition} isDay={weather.isDay} /> : <div className="wx-loading" />}
-        </motion.div>
+        </div>
         <div className="weather-main">
           <div className="weather-temp">
             {weather ? round(weather.temperature) : '--'}

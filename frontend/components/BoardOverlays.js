@@ -144,7 +144,7 @@ const LinkItem = memo(function LinkItem({ id, from, to, d, color, label, thread,
   );
 });
 
-export function LinksLayer({ links, notes, sizes, liveDrag, preview, onRemove, onColor, style = 'thread', zoom = 1, canEdit = true }) {
+function LinksLayerBase({ links, notes, sizes, liveDrag, preview, onRemove, onColor, style = 'thread', zoom = 1, canEdit = true }) {
   const drag = useLiveDrag(liveDrag);
   const [active, setActive] = useState(null);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
@@ -253,7 +253,7 @@ const Pin = memo(function Pin({ id, x, y, color }) {
 });
 
 // Tachinhas por cima dos post-its (só nos que têm fio): mostram de onde sai cada fio
-export function PinsLayer({ links, notes, sizes, liveDrag }) {
+function PinsLayerBase({ links, notes, sizes, liveDrag }) {
   const drag = useLiveDrag(liveDrag);
   const byId = new Map(notes.map((n) => [n.id, n]));
   const pins = new Map();
@@ -293,7 +293,7 @@ export function subjectGroups(notes, sizes, drag) {
     });
 }
 
-export function SubjectZones({ notes, sizes, liveDrag, onPick }) {
+function SubjectZonesBase({ notes, sizes, liveDrag, onPick }) {
   const drag = useLiveDrag(liveDrag);
   const zones = subjectGroups(notes, sizes, drag);
   return (
@@ -326,7 +326,7 @@ const MiniRect = memo(function MiniRect({ x, y, w, h, color }) {
   return <rect x={x} y={y} width={w} height={h} rx="1.5" style={{ fill: `var(--${color})` }} />;
 });
 
-export function Minimap({ notes, sizes, liveDrag, boardRef, board, boardTop, onClose }) {
+function MinimapBase({ notes, sizes, liveDrag, boardRef, board, boardTop, onClose }) {
   const drag = useLiveDragThrottled(liveDrag);
   const [view, setView] = useState(null);
   const dragging = useRef(false);
@@ -416,3 +416,10 @@ export function Minimap({ notes, sizes, liveDrag, boardRef, board, boardTop, onC
     </motion.div>
   );
 }
+
+// Memorizadas: abrir uma janela, um aviso ou trocar de tela refazia fios, tachinhas, zonas e minimapa
+// inteiros (com 200 post-its, 4 fps ao abrir a janela num PC fraco). Agora só quando os dados delas mudam.
+export const LinksLayer = memo(LinksLayerBase);
+export const PinsLayer = memo(PinsLayerBase);
+export const SubjectZones = memo(SubjectZonesBase);
+export const Minimap = memo(MinimapBase);

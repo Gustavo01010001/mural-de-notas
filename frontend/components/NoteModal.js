@@ -400,10 +400,15 @@ export default function NoteModal({
                     key={key}
                     type="button"
                     className="extra-chip"
-                    onClick={() => {
+                    onClick={(e) => {
+                      const modal = e.currentTarget.closest('.note-modal');
                       setExtras((x) => ({ ...x, [key]: true }));
                       if (key === 'date') setForm((f) => ({ ...f, hasDate: true }));
                       if (key === 'photo') fileRef.current?.click();
+                      // o cursor já vai para o campo novo: o botão some ao ser clicado e, sem isso, o que a
+                      // pessoa digitava (o 1º item da checklist) caía no título — e o Enter salvava o post-it
+                      const field = { checklist: '.check-add input', tags: '.tag-edit input', date: 'input[type="date"]' }[key];
+                      if (field) setTimeout(() => modal?.querySelector(field)?.focus(), 50);
                     }}
                   >
                     <Icon name={icon} size={15} /> {label}

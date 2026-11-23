@@ -336,7 +336,8 @@ function MinimapBase({ notes, sizes, liveDrag, boardRef, board, boardTop, onClos
     const el = boardRef.current;
     if (!el) return;
     const z = board.getZoom();
-    setView({ x: el.scrollLeft / z, y: (el.scrollTop - boardTop) / z, w: el.clientWidth / z, h: (el.clientHeight - boardTop) / z });
+    const sc = board.getScroll?.() ?? { x: el.scrollLeft, y: el.scrollTop }; // certo mesmo no meio de um zoom
+    setView({ x: sc.x / z, y: (sc.y - boardTop) / z, w: el.clientWidth / z, h: (el.clientHeight - boardTop) / z });
   }, [boardRef, board, boardTop]);
 
   useEffect(() => {
@@ -347,7 +348,7 @@ function MinimapBase({ notes, sizes, liveDrag, boardRef, board, boardTop, onClos
     const off = board.subscribe(() => {
       // modo leve (aparelho fraco): só quando o movimento para — redesenhar o minimapa no meio do zoom pesava
       const lite = document.documentElement.classList.contains('lite');
-      const wait = lite ? 220 : Math.max(0, 80 - (performance.now() - last));
+      const wait = lite ? 450 : Math.max(0, 80 - (performance.now() - last));
       clearTimeout(timer);
       timer = setTimeout(() => {
         last = performance.now();

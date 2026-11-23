@@ -9,7 +9,11 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 2;
-const COMMIT_DELAY = 140; // ms parado depois do gesto para gravar o zoom
+// Folgas pensadas para aparelho lento, onde um quadro pode passar de 180 ms: com folga curta o gesto "parecia"
+// terminar no meio — o zoom era gravado (página redesenhada) e a classe is-moving saía e voltava, recalculando os
+// 200 post-its e recriando a camada do mural a cada vez.
+const COMMIT_DELAY = 250; // ms parado depois do gesto para gravar o zoom
+export const MOVING_END = 400; // ms parado para o mural deixar de estar "em movimento"
 const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 
 // Tamanho do mural na tela: o conteúdo (já com zoom) + sempre UMA TELA livre à direita e embaixo.
@@ -55,7 +59,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
     if (!board) return;
     if (!board.classList.contains('is-moving')) board.classList.add('is-moving');
     clearTimeout(movingTimer.current);
-    movingTimer.current = setTimeout(() => board.classList.remove('is-moving'), 180);
+    movingTimer.current = setTimeout(() => board.classList.remove('is-moving'), MOVING_END);
   }, [boardRef]);
 
   const notify = useCallback(() => {
@@ -68,67 +72,94 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
     return () => listeners.current.delete(fn);
   }, []);
 
+  // Durante um gesto de zoom a rolagem é "virtual": o deslocamento que mantém parado o ponto sob o cursor vai
+  // no transform da camada (translate + scale, só placa de vídeo) e a rolagem de verdade só muda no fim.
+  // Mexer na rolagem a cada giro da roda obrigava o navegador a redesenhar o documento e reorganizar as
+  // camadas a cada quadro. room.current: { rect, s0 (rolagem real no início), v (rolagem virtual) }.
+  const scrollNow = useCallback(() => {
+    const board = boardRef.current;
+    const r = room.current;
+    if (!board) return { x: 0, y: 0 };
+    // rolagem real feita no meio do gesto (ex.: dois dedos no touchpad) soma por cima da virtual
+    return r ? { x: r.v.x + board.scrollLeft - r.s0.x, y: r.v.y + board.scrollTop - r.s0.y } : { x: board.scrollLeft, y: board.scrollTop };
+  }, [boardRef]);
+
+  // Põe a camada no zoom atual como se a rolagem fosse (left, top)
+  const place = useCallback(
+    (left, top) => {
+      const board = boardRef.current;
+      const layer = layerRef.current;
+      const r = room.current;
+      if (!board || !layer || !r) return;
+      r.v = { x: left - (board.scrollLeft - r.s0.x), y: top - (board.scrollTop - r.s0.y) };
+      layer.style.transform = `translate(${r.s0.x - r.v.x}px, ${r.s0.y - r.v.y}px) scale(${z.current})`;
+    },
+    [boardRef, layerRef],
+  );
+
   // Aplica o zoom `next` mantendo parado o ponto da tela (ax, ay) — ex.: onde está o cursor
   const apply = useCallback(
     (next, ax, ay) => {
       const board = boardRef.current;
-      const canvas = canvasRef.current;
-      const layer = layerRef.current;
-      if (!board || !canvas || !layer) return;
+      if (!board || !layerRef.current) return;
       const prev = z.current;
       next = clampZoom(next);
-      // retângulo do mural e tamanho atual lidos uma vez por gesto (ler a cada giro da roda forçava o
-      // navegador a recalcular o layout no meio do zoom)
-      room.current ??= { w: canvas.offsetWidth, h: canvas.offsetHeight, rect: board.getBoundingClientRect() };
-      const rect = room.current.rect;
+      // retângulo do mural e rolagem real lidos uma vez por gesto
+      if (!room.current) {
+        const s0 = { x: board.scrollLeft, y: board.scrollTop };
+        room.current = { rect: board.getBoundingClientRect(), s0, v: { ...s0 } };
+      }
+      const { rect } = room.current;
       const px = ax - rect.left;
       const py = ay - rect.top;
+      const sc = scrollNow();
       // ponto do mural que está debaixo do cursor
-      const bx = (board.scrollLeft + px) / prev;
-      const by = (board.scrollTop + py - boardTop) / prev;
-      const { w, h } = size.current;
-      layer.style.transform = next === 1 ? '' : `scale(${next})`;
-      // Durante o gesto só a escala muda: a placa de vídeo amplia o que já está desenhado, sem redesenhar
-      // os post-its (mudar também o tamanho do mural a cada giro da roda custava metade dos quadros).
-      // O mural só cresce quando falta espaço para rolar (com folga, raramente); o tamanho exato é
-      // acertado no fim do gesto (fitRoom).
-      const needW = w * next + board.clientWidth;
-      const needH = h * next + boardTop + board.clientHeight;
-      if (needW > room.current.w || needH > room.current.h) {
-        room.current = { ...room.current, w: Math.ceil(Math.max(needW, room.current.w) * 1.25), h: Math.ceil(Math.max(needH, room.current.h) * 1.25) };
-        canvas.style.width = `${room.current.w}px`;
-        canvas.style.height = `${room.current.h}px`;
-      }
+      const bx = (sc.x + px) / prev;
+      const by = (sc.y + py - boardTop) / prev;
       z.current = next;
-      board.scrollLeft = bx * next - px;
-      board.scrollTop = by * next + boardTop - py;
+      room.current.anchor = { px, py };
+      place(bx * next - px, by * next + boardTop - py);
       notify();
     },
-    [boardRef, canvasRef, layerRef, boardTop, notify],
+    [boardRef, layerRef, boardTop, notify, scrollNow, place],
   );
 
-  // Fim do gesto: o mural volta ao tamanho exato do zoom atual (o mesmo que o React vai desenhar)
-  const fitRoom = useCallback(() => {
+  // Fim do gesto: zoom arredondado (o mesmo que o React vai desenhar), mural no tamanho exato desse zoom e a
+  // rolagem virtual vira rolagem de verdade — sem pulo na tela
+  const commit = useCallback(() => {
+    clearTimeout(commitTimer.current);
+    gesturing.current = false;
+    const board = boardRef.current;
     const canvas = canvasRef.current;
     const layer = layerRef.current;
+    if (room.current && board && canvas && layer) {
+      const sc = scrollNow();
+      const zz = Math.round(z.current * 100) / 100;
+      // o arredondamento mantém parado o último ponto mirado (cursor), ou o centro da tela
+      const cx = room.current.anchor?.px ?? board.clientWidth / 2;
+      const cy = room.current.anchor?.py ?? board.clientHeight / 2;
+      const left = ((sc.x + cx) / z.current) * zz - cx;
+      const top = ((sc.y + cy - boardTop) / z.current) * zz + boardTop - cy;
+      z.current = zz;
+      room.current = null;
+      const st = boardStyles(size.current.w, size.current.h, zz, boardTop);
+      layer.style.width = st.layer.width;
+      layer.style.height = st.layer.height;
+      layer.style.transform = st.layer.transform ?? '';
+      canvas.style.width = st.canvas.width;
+      canvas.style.height = st.canvas.height;
+      board.scrollLeft = left;
+      board.scrollTop = top;
+    }
     room.current = null;
-    if (!canvas || !layer) return;
-    const st = boardStyles(size.current.w, size.current.h, z.current, boardTop);
-    layer.style.width = st.layer.width;
-    layer.style.height = st.layer.height;
-    canvas.style.width = st.canvas.width;
-    canvas.style.height = st.canvas.height;
-  }, [canvasRef, layerRef, boardTop]);
+    onZoomCommit(Math.round(z.current * 100) / 100);
+  }, [boardRef, canvasRef, layerRef, boardTop, onZoomCommit, scrollNow]);
 
   const scheduleCommit = useCallback(() => {
     gesturing.current = true;
     clearTimeout(commitTimer.current);
-    commitTimer.current = setTimeout(() => {
-      gesturing.current = false;
-      fitRoom();
-      onZoomCommit(Math.round(z.current * 100) / 100);
-    }, COMMIT_DELAY);
-  }, [onZoomCommit, fitRoom]);
+    commitTimer.current = setTimeout(commit, COMMIT_DELAY);
+  }, [commit]);
 
   const stopMotion = useCallback(() => {
     cancelAnimationFrame(anim.current);
@@ -170,6 +201,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       const board = boardRef.current;
       if (!board) return;
       stopMotion();
+      if (room.current) commit();
       const left = x * z.current - board.clientWidth / 2;
       const top = y * z.current + boardTop - board.clientHeight / 2;
       if (!animate) {
@@ -180,7 +212,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       }
       board.scrollTo({ left, top, behavior: 'smooth' });
     },
-    [boardRef, boardTop, notify, stopMotion],
+    [boardRef, boardTop, notify, stopMotion, commit],
   );
 
   // Enquadra uma área do mural (ex.: todos os post-its) na tela
@@ -195,8 +227,7 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       const target = clampZoom(Math.min(1, viewW / Math.max(1, box.w), viewH / Math.max(1, box.h)));
       const from = z.current;
       const [cx, cy] = [box.x + box.w / 2, box.y + box.h / 2];
-      const startLeft = board.scrollLeft;
-      const startTop = board.scrollTop;
+      const { x: startLeft, y: startTop } = scrollNow();
       const t0 = performance.now();
       const step = (now) => {
         const t = easeOut(Math.min(1, (now - t0) / 320));
@@ -207,15 +238,14 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
         const fitsH = box.h * cur <= board.clientHeight - boardTop - 90 - pad;
         const endLeft = fitsW ? cx * cur - board.clientWidth / 2 : box.x * cur - pad / 2;
         const endTop = fitsH ? cy * cur + boardTop - (board.clientHeight + boardTop - 90) / 2 : box.y * cur - pad / 2;
-        board.scrollLeft = startLeft + (endLeft - startLeft) * t;
-        board.scrollTop = startTop + (endTop - startTop) * t;
+        place(startLeft + (endLeft - startLeft) * t, startTop + (endTop - startTop) * t);
         notify();
         if (t < 1) anim.current = requestAnimationFrame(step);
         else scheduleCommit();
       };
       anim.current = requestAnimationFrame(step);
     },
-    [boardRef, boardTop, enabled, apply, notify, scheduleCommit, stopMotion],
+    [boardRef, boardTop, enabled, apply, notify, scheduleCommit, stopMotion, scrollNow, place],
   );
 
   useEffect(() => {
@@ -362,5 +392,6 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
   const getZoom = useCallback(() => z.current, []);
 
   // objeto estável: quem usa (minimapa, efeitos) não re-executa a cada renderização
-  return useMemo(() => ({ zoomTo, zoomBy, panTo, fitBox, subscribe, getZoom }), [zoomTo, zoomBy, panTo, fitBox, subscribe, getZoom]);
+  // getScroll: rolagem "de verdade" mesmo no meio de um gesto de zoom (minimapa)
+  return useMemo(() => ({ zoomTo, zoomBy, panTo, fitBox, subscribe, getZoom, getScroll: scrollNow }), [zoomTo, zoomBy, panTo, fitBox, subscribe, getZoom, scrollNow]);
 }

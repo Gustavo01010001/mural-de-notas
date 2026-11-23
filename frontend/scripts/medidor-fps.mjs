@@ -95,6 +95,9 @@ return document.querySelectorAll('.postit').length;`;
 const SCEN = {
   parado: `return await __fps(null);`,
   perfil: `return 'x';`,
+  prep: `await __reset(); await __w(900); return 'ok';`,
+  ancora: `await __reset(); const a=[...document.querySelectorAll('.postit')].find(p=>{const r=p.getBoundingClientRect(); return r.top>120&&r.left>120&&r.right<innerWidth-300&&r.bottom<innerHeight-80&&document.elementFromPoint(r.left+10,r.top+10)?.closest('.postit')===p;}); if(!a) return 'sem post-it livre'; const c=()=>{const r=a.querySelector('.postit-title').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)];}; const p0=c(); const r0=a.getBoundingClientRect(); const ax=r0.left+10, ay=r0.top+10; const pt=()=>{const r=a.getBoundingClientRect(); return [Math.round(r.left-ax), Math.round(r.top-ay)];}; const ini=pt(); for(let i=0;i<12;i++){ __b.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-8,clientX:ax,clientY:ay})); await __f(); } const meio=pt(); const escalaMeio=document.querySelector('.canvas-zoom').style.transform; await __w(700); const depois=pt(); const escalaDepois=document.querySelector('.canvas-zoom').style.transform; const rol=[__b.scrollLeft,__b.scrollTop].map(Math.round); await __reset(); return {canto_do_postit_rel_cursor:{inicio:ini, meio_do_gesto:meio, depois_de_gravar:depois}, escalaMeio, escalaDepois, rolagem_depois:rol};`,
+  zoom_puro: `return await __fps(i=>__b.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:Math.sin(i/12)*10,clientX:innerWidth/2,clientY:innerHeight/2})));`,
   zoom_volta: `const info=()=>({escala:document.querySelector('.canvas-zoom').style.transform||'1', far:__b.classList.contains('far'), bloqueio:!!document.querySelector('.modal-backdrop, .drawer, .search-backdrop'), foco:document.activeElement?.tagName}); for(let k=0;k<6;k++){ window.dispatchEvent(new KeyboardEvent('keydown',{key:'-'})); await __w(400);} await __w(900); const a=info(); window.dispatchEvent(new KeyboardEvent('keydown',{key:'0'})); await __w(1200); const b=info(); return {longe:a, depois_do_0:b};`,
   todas_animacoes: `const g={}; for(const a of document.getAnimations()){ const t=a.effect?.target; const nome=(a.animationName||(a.constructor.name==='CSSTransition'?'transition:'+a.transitionProperty:'waapi'))+' @ '+((t?.className?.baseVal ?? t?.className)||t?.tagName||'?').toString().split(' ').slice(0,2).join('.')+(a.effect?.pseudoElement||''); const props=[...new Set((a.effect?.getKeyframes?.()||[]).flatMap(k=>Object.keys(k).filter(x=>!['offset','easing','composite','computedOffset'].includes(x))))].join(','); const k=nome+' ['+props+'] '+a.playState+' fill='+(a.effect?.getTiming?.().fill); g[k]=(g[k]||0)+1; } return Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,15);`,
   camadas: `const g={}; for(const el of document.querySelectorAll('*')){ const cs=getComputedStyle(el); const motivos=[]; if(cs.willChange&&cs.willChange!=='auto') motivos.push('will-change:'+cs.willChange); if(cs.backdropFilter&&cs.backdropFilter!=='none') motivos.push('backdrop'); if(cs.transform!=='none'&&/3d|matrix3d/.test(cs.transform)) motivos.push('transform3d'); if(cs.filter!=='none') motivos.push('filter'); if(cs.mixBlendMode!=='normal') motivos.push('blend'); if(!motivos.length) continue; const nome=((el.className?.baseVal ?? el.className)||el.tagName).toString().split(' ')[0]; const k=nome+' → '+motivos.join(','); g[k]=(g[k]||0)+1; } return Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,12);`,
@@ -113,6 +116,9 @@ const SCEN = {
     on=false; return Math.round(n*1000/(performance.now()-t0))+'/'+lg;`,
 };
 const VARIANTS = {
+  canvas_clip: '.canvas.free{overflow:clip!important}',
+  fios_escalam: '.links-layer path{vector-effect:none!important}',
+  sem_fios_tachinhas: '.links-layer,.pins-layer,.link-toolbar-layer{display:none!important}',
   fita_antiga: '.postit-tape{top:-12px!important;left:50%!important;width:90px!important;height:26px!important;transform:translateX(-50%) rotate(-3deg)!important;background:rgba(255,255,255,.45)!important;border-left:2px dashed rgba(255,255,255,.4)!important;border-right:2px dashed rgba(255,255,255,.4)!important}',
   tres_pedacos: '.postit-tape{transform:none!important} .postit-content{overflow:visible!important;max-height:none!important} .resize-handle{display:none!important}',
   conteudo_sem_corte: '.postit-content{overflow:visible!important;max-height:none!important}',
@@ -183,13 +189,48 @@ try {
         const out = join(work, 'foto-' + v + '.png'); writeFileSync(out, Buffer.from(shot.result.data, 'base64')); row.foto = out;
         continue;
       }
+      if (c === 'arrumar') {
+        row.arrumar = await ev(`const r=await fetch('/api/notes/arrange',{method:'POST',headers:{'X-Mural':'1','Content-Type':'application/json'},body:JSON.stringify({folderId:null,columns:8})}); return r.status;`);
+        await go('/'); await sleep(1500); await ev(SETUP);
+        continue;
+      }
+      if (c === 'arraste_borda') {
+        await ev('await __reset(); await __w(600); return 1;');
+        const alvo = await ev(`const ps=[...document.querySelectorAll('.postit')].filter(p=>{const r=p.getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+40; return r.left>20&&r.right<innerWidth-260&&r.top>80&&r.top<innerHeight*0.65&&document.elementFromPoint(cx,cy)?.closest('.postit')===p;}); const a=ps[0]; if(!a) return null; window.__alvo=a; const r=a.getBoundingClientRect(); return {id:a.dataset.noteId, x:r.left+r.width/2, y:r.top+40, left:a.style.left, top:a.style.top};`);
+        if (!alvo) { row[c] = 'sem alvo'; continue; }
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x, y: alvo.y });
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: alvo.x, y: alvo.y, button: 'left', clickCount: 1 });
+        const alvoY = 768 - 100; // perto da borda de baixo: aciona a rolagem automática
+        for (let i = 1; i <= 15; i++) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x, y: alvo.y + (alvoY - alvo.y) * i / 15, button: 'left', buttons: 1 }); await sleep(30); }
+        await sleep(700);
+        const meio = await ev(`return {translate:__alvo.style.translate, scroll:[__b.scrollLeft,__b.scrollTop].map(Math.round), dock:!!document.querySelector('.drop-dock'), dockRect: document.querySelector('.drop-dock')?.getBoundingClientRect().top};`);
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: alvo.x, y: alvoY, button: 'left', clickCount: 1 });
+        await sleep(1000);
+        const depois = await ev(`const n=(await (await fetch('/api/notes?folder=root',{headers:{'X-Mural':'1'}})).json()).notes.find(n=>String(n.id)==='${alvo.id}'); return {left:__alvo.style.left, top:__alvo.style.top, translate:__alvo.style.translate||'(vazio)', arrastando:__alvo.classList.contains('is-dragging'), salvo: n ? Math.round(n.x)+','+Math.round(n.y) : 'saiu da pasta raiz'};`);
+        row[c] = { antes: alvo.left + ',' + alvo.top, durante: meio, depois };
+        continue;
+      }
+      if (c === 'arraste_meio' || c === 'arraste_rodape') {
+        await ev('await __reset(); await __w(600); return 1;');
+        const alvo = await ev(`const meio = ${c === 'arraste_meio'}; const ps=[...document.querySelectorAll('.postit')].filter(p=>{const r=p.getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+40; return r.left>40&&r.right<innerWidth-300&&r.top>100&&r.bottom<innerHeight-20&&document.elementFromPoint(cx,cy)?.closest('.postit')===p;}); ps.sort((a,b)=>{const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect(); return meio ? Math.abs(ra.top-innerHeight/2+100)-Math.abs(rb.top-innerHeight/2+100) : rb.bottom-ra.bottom;}); const a=ps[0]; if(!a) return null; window.__alvo=a; const r=a.getBoundingClientRect(); return {id:a.dataset.noteId, x:r.left+r.width/2, y:r.top+40, left:a.style.left, top:a.style.top, bottom:Math.round(innerHeight-r.bottom)};`);
+        if (!alvo) { row[c] = 'sem alvo'; continue; }
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x, y: alvo.y });
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: alvo.x, y: alvo.y, button: 'left', clickCount: 1 });
+        for (let i = 1; i <= 20; i++) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x + i * 4, y: alvo.y + i * 3, button: 'left', buttons: 1 }); await sleep(20); }
+        const meio = await ev(`return {translate:__alvo.style.translate, scroll:[__b.scrollLeft,__b.scrollTop].map(Math.round), dock:!!document.querySelector('.drop-dock')};`);
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: alvo.x + 80, y: alvo.y + 60, button: 'left', clickCount: 1 });
+        await sleep(900);
+        const depois = await ev(`return {left:__alvo.style.left, top:__alvo.style.top, translate:__alvo.style.translate||'(vazio)', arrastando:__alvo.classList.contains('is-dragging'), conectado:__alvo.isConnected};`);
+        row[c] = { distancia_do_rodape: alvo.bottom, antes: alvo.left + ',' + alvo.top, durante: meio, depois };
+        continue;
+      }
       if (c === 'funcional') {
         const R = {};
         await send('Log.enable'); const erros = [];
         ws.addEventListener('message', (m) => { const d = JSON.parse(m.data); if (d.method === 'Runtime.exceptionThrown') erros.push(d.params.exceptionDetails?.exception?.description?.slice(0, 120)); if (d.method === 'Log.entryAdded' && d.params.entry.level === 'error') erros.push(d.params.entry.text.slice(0, 120)); });
         await ev('await __reset(); return 1;');
         // 1) arrastar e soltar com o mouse de verdade
-        const alvo = await ev(`const ligados=new Set([...document.querySelectorAll('.links-layer g[data-a]')].flatMap(g=>[g.dataset.a,g.dataset.b])); const vis=[...document.querySelectorAll('.postit')].filter(p=>{const r=p.getBoundingClientRect(); return r.top>100&&r.bottom<innerHeight-60&&r.left>40&&r.right<innerWidth-300;}); const a=vis.find(p=>ligados.has(p.dataset.noteId))||vis[0]; window.__alvo=a; const fio=document.querySelector('.links-layer g[data-a="'+a.dataset.noteId+'"] .link-line, .links-layer g[data-b="'+a.dataset.noteId+'"] .link-line'); window.__fio=fio; const r=a.getBoundingClientRect(); return {id:a.dataset.noteId, x:r.left+r.width/2, y:r.top+40, left:a.style.left, top:a.style.top, fio:fio?.getAttribute('d')?.slice(0,30)};`);
+        const alvo = await ev(`const ligados=new Set([...document.querySelectorAll('.links-layer g[data-a]')].flatMap(g=>[g.dataset.a,g.dataset.b])); const vis=[...document.querySelectorAll('.postit')].filter(p=>{const r=p.getBoundingClientRect(); if(!(r.top>100&&r.bottom<innerHeight-60&&r.left>40&&r.right<innerWidth-300)) return false; return document.elementFromPoint(r.left+r.width/2, r.top+40)?.closest('.postit')===p && document.elementFromPoint(r.left+r.width/2+80, r.top+100)?.closest('.postit')===p;}); const a=vis.find(p=>ligados.has(p.dataset.noteId))||vis[0]; window.__alvo=a; const fio=document.querySelector('.links-layer g[data-a="'+a.dataset.noteId+'"] .link-line, .links-layer g[data-b="'+a.dataset.noteId+'"] .link-line'); window.__fio=fio; const r=a.getBoundingClientRect(); return {id:a.dataset.noteId, x:r.left+r.width/2, y:r.top+40, left:a.style.left, top:a.style.top, fio:fio?.getAttribute('d')?.slice(0,30)};`);
         await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x, y: alvo.y });
         await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: alvo.x, y: alvo.y, button: 'left', clickCount: 1 });
         for (let i = 1; i <= 20; i++) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: alvo.x + i * 4, y: alvo.y + i * 3, button: 'left', buttons: 1 }); await sleep(20); }
@@ -281,7 +322,8 @@ try {
           await send('Input.synthesizeScrollGesture', { x, y, yDistance: -1600, xDistance: MOBILE ? 0 : -600, speed: 900, gestureSourceType: MOBILE ? 'touch' : 'mouse', repeatCount: 1 });
           await send('Input.synthesizeScrollGesture', { x, y, yDistance: 1600, xDistance: MOBILE ? 0 : 600, speed: 900, gestureSourceType: MOBILE ? 'touch' : 'mouse', repeatCount: 1 });
         } else {
-          const p = await ev(`const a=[...document.querySelectorAll('.postit')].find(p=>{const r=p.getBoundingClientRect(); return r.top>90&&r.bottom<innerHeight-60&&r.left>40&&r.right<innerWidth-280;}); const r=a.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+40};`);
+          const p = await ev(`const livre=(p)=>{const r=p.getBoundingClientRect(); return document.elementFromPoint(r.left+r.width/2, r.top+40)?.closest('.postit')===p;}; const ps=[...document.querySelectorAll('.postit')]; const a=ps.find(p=>{const r=p.getBoundingClientRect(); return r.top>90&&r.bottom<innerHeight-60&&r.left>40&&r.right<innerWidth-280&&livre(p);}) || ps.find(p=>{const r=p.getBoundingClientRect(); return r.top>80&&r.top<innerHeight-200&&r.left>20&&r.left<innerWidth-400&&livre(p);}); if(!a) return null; const r=a.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+40};`);
+          if (!p) { row[c] = 'sem alvo'; await ev(`__cnt.on=false; return 1;`); continue; }
           await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
           await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
           for (let i = 0; i < 150; i++) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x + Math.sin(i / 10) * 120, y: p.y + 60 + Math.cos(i / 10) * 60, button: 'left', buttons: 1 }); await sleep(16); }
@@ -300,7 +342,7 @@ try {
       }
       if (c.startsWith('t_')) {
         traceBuf = [];
-        await send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,blink.user_timing,v8.execute', transferMode: 'ReportEvents' });
+        await send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,blink.user_timing,v8.execute' + (process.env.INVAL ? ',disabled-by-default-devtools.timeline.invalidationTracking' : ''), transferMode: 'ReportEvents' });
         const fps = await ev(SCEN[c.slice(2)]);
         const done = new Promise((r) => (traceDone = r));
         await send('Tracing.end'); await done;
@@ -315,6 +357,12 @@ try {
         const top = Object.entries(tot).filter(([k]) => !['RunTask','ThreadControllerImpl::RunTask','RunMicrotasks','EvaluateScript'].includes(k)).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => k + ' ' + Math.round(v));
         const fn = {};
         for (const e of traceBuf) { if (main && (e.pid !== main.pid || e.tid !== main.tid)) continue; if ((e.name === 'FunctionCall' || e.name === 'TimerFire') && e.dur) { const dd = e.args?.data || {}; const k = e.name + ':' + (dd.functionName || dd.timerId || '?') + '@' + (dd.url || '').split('/').pop().slice(0, 22) + ':' + (dd.lineNumber ?? '') + ':' + (dd.columnNumber ?? ''); fn[k] = (fn[k] || 0) + e.dur / 1000; } }
+        const inv = {};
+        for (const e of traceBuf) { if (e.name === 'PaintInvalidationTracking' || e.name === 'LayoutInvalidationTracking' || (!process.env.SO_DESENHO && e.name === 'StyleInvalidatorInvalidationTracking')) { const dd = e.args?.data || {}; const k = e.name.replace('InvalidationTracking','') + ': ' + (dd.reason || dd.invalidationList?.[0]?.classes?.join('.') || '?') + ' @ ' + String(dd.nodeName || '').slice(0, 40); inv[k] = (inv[k] || 0) + 1; } }
+        const pinta = {};
+        for (const e of traceBuf) { if (e.name === 'Paint' && e.dur) { const dd = e.args?.data || {}; const k = (dd.nodeName || ('layer ' + (dd.layerId ?? '?'))) .toString().slice(0, 50); pinta[k] = pinta[k] || { n: 0, ms: 0 }; pinta[k].n++; pinta[k].ms += e.dur / 1000; } }
+        if (process.env.INVAL) row[c + '_pinta'] = Object.entries(pinta).sort((x, y) => y[1].ms - x[1].ms).slice(0, 8).map(([k, v]) => k + ' ×' + v.n + ' ' + Math.round(v.ms) + 'ms');
+        if (process.env.INVAL) row[c + '_invalidacoes'] = Object.entries(inv).sort((x, y) => y[1] - x[1]).slice(0, 14);
         row[c] = { fps, layerize: Math.round(tot.Layerize || 0), paint: Math.round(tot.Paint || 0), top: top.slice(0, 4), funcoes: Object.entries(fn).sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => k + ' ' + Math.round(v)), recalc_elementos_por_vez: n ? Math.round(elems / n) : 0, recalcs: n };
         continue;
       }

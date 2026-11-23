@@ -22,7 +22,7 @@ import { FolderDropDock, LiveCursors, PresenceBar } from '@/components/LiveLayer
 import { useLiveFolder } from '@/lib/useLiveFolder';
 import { flattenTree } from '@/lib/folderTree';
 import { BoardTools, SelectionBar } from '@/components/BoardTools';
-import { boardStyles, useInfiniteBoard, ZOOM_MAX, ZOOM_MIN } from '@/lib/useInfiniteBoard';
+import { boardStyles, MOVING_END, useInfiniteBoard, ZOOM_MAX, ZOOM_MIN } from '@/lib/useInfiniteBoard';
 import { createLiveDrag, LinksLayer, Minimap, noteRect, PinsLayer, SubjectZones, useNoteSizes } from '@/components/BoardOverlays';
 import { mindMapLayout } from '@/lib/mindMap';
 import { useWeather } from '@/lib/useWeather';
@@ -1045,7 +1045,7 @@ export default function BoardPage() {
     const onScroll = () => {
       if (!board.classList.contains('is-moving')) board.classList.add('is-moving');
       clearTimeout(timer);
-      timer = setTimeout(() => board.classList.remove('is-moving'), 180);
+      timer = setTimeout(() => board.classList.remove('is-moving'), MOVING_END);
     };
     board.addEventListener('scroll', onScroll, { passive: true });
     return () => {
@@ -1078,7 +1078,8 @@ export default function BoardPage() {
   const toBoard = (cx, cy) => {
     const el = boardRef.current;
     const zz = boardApi.getZoom();
-    return { x: (cx + el.scrollLeft) / zz, y: (cy + el.scrollTop - BOARD_TOP) / zz };
+    const sc = boardApi.getScroll(); // rolagem certa mesmo no meio de um gesto de zoom
+    return { x: (cx + sc.x) / zz, y: (cy + sc.y - BOARD_TOP) / zz };
   };
 
   async function createLink(fromId, toId) {

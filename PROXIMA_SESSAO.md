@@ -1,7 +1,7 @@
 # Próxima sessão: onde paramos (otimização 60 fps)
 
 > Leia isto primeiro. Ele resume o estado da otimização e evita refazer investigação já feita.
-> Última atualização: 22/11/2026 (5ª rodada).
+> Última atualização: 22/11/2026 (6ª rodada).
 
 ## Meta
 
@@ -11,8 +11,17 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Estado do git
 
-- **Tudo enviado ao GitHub** em 22/11/2026 (até a 5ª rodada), a pedido do Gustavo.
+- Enviado ao GitHub até a 5ª rodada (`83b8f03`). A 6ª rodada pode estar só em commit local: conferir
+  `git status -sb` (enviar só com aprovação do Gustavo).
 - Fora do git (não commitar): `graphify-out/` (mapa do graphify) e `Lixeira - Atalho.lnk`.
+
+## 6ª rodada (22/11/2026, noite) — zoom só na placa de vídeo
+
+| Mudança | Arquivo(s) | Ganho medido |
+|---|---|---|
+| Zoom com **rolagem virtual**: durante o gesto o deslocamento que mantém o ponto sob o cursor vai no `transform` da camada (`translate(...) scale(...)`); a rolagem de verdade só muda no fim (`commit`). Arredondamento do zoom ancorado no cursor (sem pulo: testado com o cenário `ancora`). `getScroll()` dá a rolagem certa no meio do gesto (minimapa, `toBoard`) | `lib/useInfiniteBoard.js`, `BoardOverlays.js`, `page.js` | Antes, mexer na rolagem a cada giro da roda redesenhava o documento todo quadro. Só o gesto (PC 4×, 200): Paint ~900 → **~300 ms**, documento redesenhado 49 → ~23 vezes; zoom com 200 post-its: 21–35 → **39–44** |
+| Folgas para aparelho lento: fim do movimento 180 → **400 ms** (`MOVING_END`), gravar o zoom 140 → **250 ms**, minimapa no leve 220 → **450 ms** | `lib/useInfiniteBoard.js`, `page.js`, `BoardOverlays.js` | Com quadros de mais de 180 ms, o gesto "parecia" terminar no meio: is-moving saía e voltava (recalculava 200 post-its e recriava a camada) e o zoom era gravado no meio |
+| Testado e **descartado**: `overflow: clip` no `.canvas` durante o zoom (piorou: documento redesenhado 45–70 vezes) | — | — |
 
 ## 5ª rodada (22/11/2026, noite) — menos pedaços de desenho por post-it
 
@@ -61,12 +70,16 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Números (build de produção, Chrome invisível, 200 post-its salvo indicação)
 
-| Cenário (após a 5ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
+| Cenário (após a 6ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
 |---|---|---|---|---|---|
-| PC normal, completo | 60 | 57–58 | 48–58 | 29–47 | 53–55 |
-| PC 4× mais lento, leve, **40 post-its** | 61 | **42–59** | **56–59** | **36–60** | **54–58** |
-| PC 4× mais lento, leve, 200 post-its | 61 | **50–51** | 21–50 | 13–35 | 44–57 |
-| Celular 6× mais lento (≈ J2), leve, 40 post-its | 60 | — | 60 | — | 47–58 |
+| PC normal, completo | 60 | 52–59 | 50 | 38 | 53–56 |
+| PC 4× mais lento, leve, **40 post-its** | 61 | 29–56 | **58–60** | **48–53** | 44–58 |
+| PC 4× mais lento, leve, 200 post-its (em grade de 8 colunas*) | 61 | 18–24 | 44 | **39–44** | 34–36 |
+| Celular 6× mais lento (≈ J2), leve, 40 post-its | 61 | — | 60 | — | 35–58 |
+
+\* A conta de teste foi arrumada em grade de 8 colunas (cenário `arrumar` do medidor), que deixa mais post-its
+visíveis ao mesmo tempo do que a disposição das rodadas anteriores — arrastar/janela com 200 não são
+comparáveis com a tabela antiga. Use sempre `CENAS=arrumar,...` para partir do mesmo lugar.
 
 (Faixas largas = oscilação da máquina com Discord/Steam abertos; comparar sempre alternando `base,X,base,X`.)
 
@@ -76,12 +89,14 @@ Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4�
 ## Próximos passos (em ordem de valor)
 
 1. ~~Abrir a janela no celular fraco~~ e ~~zoom com 40 post-its~~: feitos na 3ª rodada.
-2. **Zoom com 200 post-its em aparelho fraco** (13–35): no trace do zoom o maior custo agora é **Paint**
-   (~1,3 s a cada 3 s no PC 4×) e ainda há Layerize (~0,6 s). Ideias: o post-it ainda tem transformação própria
-   (inclinação do framer-motion, `rotate`) — testar a inclinação dentro do próprio desenho; ver se o zoom
-   provoca repintura (no gesto só a escala deveria mudar). NÃO voltar com `content-visibility` (explode
-   camadas) nem `visibility: hidden` fora da tela (tira o texto do leitor de tela). Também dá para tirar mais
-   estado do `BoardPage` (graphify: 84 ligações) para stores como `lib/store.js`.
+2. **200 post-its em aparelho fraco**: zoom 39–44, rolar 44, arrastar 18–24 (grade densa). No gesto de zoom
+   ainda há Layerize (~0,5–0,7 s a cada 2,5 s no PC 4×) e o documento é redesenhado em ~metade dos quadros —
+   descobrir o que ainda invalida (cenário `t_zoom_puro` com `INVAL=1` lista o que é pintado). O post-it ainda
+   tem transformação própria (inclinação via framer-motion) — testar a inclinação no próprio desenho.
+   NÃO voltar com `content-visibility` (explode camadas), `visibility: hidden` fora da tela (tira o texto do
+   leitor de tela) nem `overflow: clip` no `.canvas` (piora o zoom).
+2b. O **back reinicia sozinho** de vez em quando (5× nesta sessão; provável OneDrive mexendo nos arquivos com o
+   `node --watch`). Nos testes aparece como "Internal Server Error"/500 — repetir o teste.
 3. Modo completo ainda tem ~71 camadas (post-its "respirando" com `translate`); só importa em aparelho bom.
 4. Next.js **16.4.3 → 16.4.6**: o próprio `next build` avisa de falha de segurança conhecida (às vezes para o
    build — rodar de novo passa). Atualizar com aprovação do Gustavo (`npm i next@16.4.6` no `frontend`).

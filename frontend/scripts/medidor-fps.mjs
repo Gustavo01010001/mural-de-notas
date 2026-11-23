@@ -113,6 +113,8 @@ const SCEN = {
     on=false; return Math.round(n*1000/(performance.now()-t0))+'/'+lg;`,
 };
 const VARIANTS = {
+  fita_antiga: '.postit-tape{top:-12px!important;left:50%!important;width:90px!important;height:26px!important;transform:translateX(-50%) rotate(-3deg)!important;background:rgba(255,255,255,.45)!important;border-left:2px dashed rgba(255,255,255,.4)!important;border-right:2px dashed rgba(255,255,255,.4)!important}',
+  tres_pedacos: '.postit-tape{transform:none!important} .postit-content{overflow:visible!important;max-height:none!important} .resize-handle{display:none!important}',
   conteudo_sem_corte: '.postit-content{overflow:visible!important;max-height:none!important}',
   sem_acoes_dom: '.postit-actions,.link-handle{display:none!important}',
   alca_fora: '.resize-handle{display:none!important}',
@@ -172,6 +174,13 @@ try {
         const a = await m(); await sleep(2000); const b = await m();
         const d = (k) => Math.round(((b[k] - a[k]) * 1000) / 2);
         row.perfil = { tarefas_ms_s: d('TaskDuration'), estilo: d('RecalcStyleDuration'), layout: d('LayoutDuration'), script: d('ScriptDuration'), quadros: Math.round((b.Frames ?? 0) - (a.Frames ?? 0)) };
+        continue;
+      }
+      if (c === 'foto') {
+        const r = await ev(`await __reset(); await __w(1500); const a=[...document.querySelectorAll('.postit')].find(p=>{const r=p.getBoundingClientRect(); return r.top>110&&r.left>40&&r.right<innerWidth-300&&p.querySelector('.postit-tape');}); const b=a.getBoundingClientRect(); return {x:Math.max(0,b.left-20),y:Math.max(0,b.top-30),w:b.width+40,h:150};`);
+        row.alvo = r;
+        const shot = await send('Page.captureScreenshot', process.env.TELA_TODA ? { format: 'png' } : process.env.CLIP ? { format: 'png', clip: (([x,y,w,h]) => ({ x:+x, y:+y, width:+w, height:+h, scale: 3 }))(process.env.CLIP.split(',')) } : { format: 'png', clip: { x: r.x, y: r.y, width: r.w, height: r.h, scale: 2 } });
+        const out = join(work, 'foto-' + v + '.png'); writeFileSync(out, Buffer.from(shot.result.data, 'base64')); row.foto = out;
         continue;
       }
       if (c === 'funcional') {
@@ -306,7 +315,7 @@ try {
         const top = Object.entries(tot).filter(([k]) => !['RunTask','ThreadControllerImpl::RunTask','RunMicrotasks','EvaluateScript'].includes(k)).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => k + ' ' + Math.round(v));
         const fn = {};
         for (const e of traceBuf) { if (main && (e.pid !== main.pid || e.tid !== main.tid)) continue; if ((e.name === 'FunctionCall' || e.name === 'TimerFire') && e.dur) { const dd = e.args?.data || {}; const k = e.name + ':' + (dd.functionName || dd.timerId || '?') + '@' + (dd.url || '').split('/').pop().slice(0, 22) + ':' + (dd.lineNumber ?? '') + ':' + (dd.columnNumber ?? ''); fn[k] = (fn[k] || 0) + e.dur / 1000; } }
-        row[c] = { fps, top, funcoes: Object.entries(fn).sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => k + ' ' + Math.round(v)), recalc_elementos_por_vez: n ? Math.round(elems / n) : 0, recalcs: n };
+        row[c] = { fps, layerize: Math.round(tot.Layerize || 0), paint: Math.round(tot.Paint || 0), top: top.slice(0, 4), funcoes: Object.entries(fn).sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => k + ' ' + Math.round(v)), recalc_elementos_por_vez: n ? Math.round(elems / n) : 0, recalcs: n };
         continue;
       }
       if (c.startsWith('p_')) {

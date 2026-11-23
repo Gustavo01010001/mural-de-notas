@@ -1,7 +1,7 @@
 # Próxima sessão: onde paramos (otimização 60 fps)
 
 > Leia isto primeiro. Ele resume o estado da otimização e evita refazer investigação já feita.
-> Última atualização: 22/11/2026 (4ª rodada).
+> Última atualização: 22/11/2026 (5ª rodada).
 
 ## Meta
 
@@ -11,10 +11,17 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Estado do git
 
-- Já no GitHub: tudo até `305d351` (segurança/Q1–Q5).
-- **Commits locais, ainda NÃO enviados:** `1dc10cf` (Q6–Q10, acessibilidade/calendário), `3ece88d`
-  (otimização 1ª rodada), `534bc8b` (2ª rodada + este arquivo + medidor), `a18598e` (3ª rodada) e o da 4ª.
+- **Tudo enviado ao GitHub** em 22/11/2026 (até a 5ª rodada), a pedido do Gustavo.
 - Fora do git (não commitar): `graphify-out/` (mapa do graphify) e `Lixeira - Atalho.lnk`.
+
+## 5ª rodada (22/11/2026, noite) — menos pedaços de desenho por post-it
+
+| Mudança | Arquivo(s) | Ganho medido |
+|---|---|---|
+| Fita desenhada já inclinada numa imagem vetorial (sem `transform`); comparada em foto ampliada 3×: igual à antiga | `globals.css` | Cada post-it vira menos pedaços de desenho: Layerize na rolagem com 200 (PC 4×) 1.634 → **1.012 ms** |
+| Corte do texto (`overflow: hidden`) só em texto longo (`.long`: > 100 caracteres ou > 5 linhas); texto curto nunca chega ao limite | `PostIt.js`, `globals.css` | Idem |
+| Alça de redimensionar com `visibility: hidden` quando não aparece (no toque, como antes) | `globals.css` | Idem |
+| Arrastar com 200 post-its (PC 4×): 32–35 → **50–51** | | |
 
 ## 4ª rodada (22/11/2026, noite) — estresse com 200 post-its
 
@@ -54,12 +61,14 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Números (build de produção, Chrome invisível, 200 post-its salvo indicação)
 
-| Cenário (após a 4ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
+| Cenário (após a 5ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
 |---|---|---|---|---|---|
-| PC normal, completo | 60 | 58 | 48–58 | 39–47 | 53–55 |
-| PC 4× mais lento, leve, **40 post-its** | 61 | **57–59** | **56–59** | **36–60** | **54–58** |
-| PC 4× mais lento, leve, 200 post-its | 61 | 32–35 | 22–51 | 21–30 | 53–57 |
-| Celular 6× mais lento (≈ J2), leve, 40 post-its | 61 | — | 60 | — | 52–58 |
+| PC normal, completo | 60 | 57–58 | 48–58 | 29–47 | 53–55 |
+| PC 4× mais lento, leve, **40 post-its** | 61 | **42–59** | **56–59** | **36–60** | **54–58** |
+| PC 4× mais lento, leve, 200 post-its | 61 | **50–51** | 21–50 | 13–35 | 44–57 |
+| Celular 6× mais lento (≈ J2), leve, 40 post-its | 60 | — | 60 | — | 47–58 |
+
+(Faixas largas = oscilação da máquina com Discord/Steam abertos; comparar sempre alternando `base,X,base,X`.)
 
 Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4–6, zoom 4–5. Rodar o medidor com
 **jogos e Steam fechados** (Forza/Steam derrubavam e oscilavam os números).
@@ -67,16 +76,16 @@ Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4�
 ## Próximos passos (em ordem de valor)
 
 1. ~~Abrir a janela no celular fraco~~ e ~~zoom com 40 post-its~~: feitos na 3ª rodada.
-2. **Estresse com 200 post-its em aparelho fraco** (zoom 21–30, rolar 22–51): o maior custo restante no trace é
-   **"Layerize"** (o Chrome percorre os pedaços de desenho dos 200 post-its a cada quadro, ~1,1–1,7 s a cada 3 s
-   no PC 4×). Ideias: menos pedaços por post-it (fita com `transform` própria, corte do texto com
-   `overflow: hidden`); NÃO voltar com `content-visibility` (explode camadas) nem `visibility: hidden` fora da
-   tela (tira o texto do leitor de tela). Também dá para tirar mais estado do `BoardPage` (graphify: 84
-   ligações) para stores como `lib/store.js`.
+2. **Zoom com 200 post-its em aparelho fraco** (13–35): no trace do zoom o maior custo agora é **Paint**
+   (~1,3 s a cada 3 s no PC 4×) e ainda há Layerize (~0,6 s). Ideias: o post-it ainda tem transformação própria
+   (inclinação do framer-motion, `rotate`) — testar a inclinação dentro do próprio desenho; ver se o zoom
+   provoca repintura (no gesto só a escala deveria mudar). NÃO voltar com `content-visibility` (explode
+   camadas) nem `visibility: hidden` fora da tela (tira o texto do leitor de tela). Também dá para tirar mais
+   estado do `BoardPage` (graphify: 84 ligações) para stores como `lib/store.js`.
 3. Modo completo ainda tem ~71 camadas (post-its "respirando" com `translate`); só importa em aparelho bom.
 4. Next.js **16.4.3 → 16.4.6**: o próprio `next build` avisa de falha de segurança conhecida (às vezes para o
    build — rodar de novo passa). Atualizar com aprovação do Gustavo (`npm i next@16.4.6` no `frontend`).
-5. Enviar ao GitHub os commits locais (sempre com aprovação: "Sim, enviar").
+5. Enviar ao GitHub sempre com aprovação do Gustavo.
 
 ## Como retomar rápido
 

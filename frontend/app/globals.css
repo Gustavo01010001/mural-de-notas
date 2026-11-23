@@ -228,16 +228,16 @@ a {
 .postit-orange { background: linear-gradient(160deg, var(--orange), var(--orange-2)); }
 .postit-purple { background: linear-gradient(160deg, var(--purple), var(--purple-2)); }
 
+/* A fita já vem inclinada no próprio desenho (90×26, -3°, bordas tracejadas), sem transform: com uma
+   transformação própria ela virava um pedaço de desenho separado em cada post-it, e com 200 post-its o
+   navegador reorganizava centenas de pedaços a cada quadro. A caixa é um pouco maior para a inclinação caber. */
 .postit-tape {
   position: absolute;
-  top: -12px;
-  left: 50%;
-  width: 90px;
-  height: 26px;
-  transform: translateX(-50%) rotate(-3deg);
-  background: rgba(255, 255, 255, 0.45);
-  border-left: 2px dashed rgba(255, 255, 255, 0.4);
-  border-right: 2px dashed rgba(255, 255, 255, 0.4);
+  top: -15px;
+  left: calc(50% - 47px);
+  width: 94px;
+  height: 32px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='94' height='32' viewBox='0 0 94 32'%3E%3Cg transform='rotate(-3 47 16)'%3E%3Crect x='2' y='3' width='90' height='26' fill='white' fill-opacity='0.45'/%3E%3Cpath d='M3 3V29M91 3V29' stroke='white' stroke-opacity='0.4' stroke-width='2' stroke-dasharray='6 4'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
   /* sem vidro fosco: o desfoque de 2 px nem aparece e, em cada um dos post-its, era o efeito mais caro
      da tela (rolagem 10 → 32 fps com 200 post-its) */
 }
@@ -258,6 +258,10 @@ a {
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 160px;
+}
+
+/* só texto longo é cortado (o corte vira um pedaço de desenho separado; texto curto nunca chega ao limite) */
+.postit-content.long {
   overflow: hidden;
 }
 
@@ -1505,7 +1509,7 @@ input:focus-visible + .switch {
 
 @keyframes tape-flap {
   50% {
-    transform: translateX(-50%) rotate(3deg) scaleY(0.9);
+    transform: rotate(6deg) scaleY(0.9);
   }
 }
 
@@ -2290,8 +2294,11 @@ button.upcoming-item:hover {
 }
 
 .postit.in-grid .postit-tape {
-  width: 64px;
-  height: 22px;
+  top: -14px;
+  left: calc(50% - 34px);
+  width: 68px;
+  height: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='68' height='28' viewBox='0 0 68 28'%3E%3Cg transform='rotate(-3 34 14)'%3E%3Crect x='2' y='3' width='64' height='22' fill='white' fill-opacity='0.45'/%3E%3Cpath d='M3 3V25M65 3V25' stroke='white' stroke-opacity='0.4' stroke-width='2' stroke-dasharray='6 4'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 @media (min-width: 560px) {
@@ -2562,6 +2569,26 @@ button.upcoming-item:hover {
 
 .postit:hover .resize-handle {
   opacity: 1;
+}
+
+/* invisível de verdade quando não aparece (opacidade 0 ainda era desenhada nos 200 post-its); no toque fica
+   como antes */
+.resize-handle {
+  visibility: hidden;
+  transition:
+    opacity 0.2s,
+    visibility 0s linear 0.2s;
+}
+
+.postit:hover .resize-handle {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (hover: none) {
+  .resize-handle {
+    visibility: visible;
+  }
 }
 
 /* ============ Formulário: checklist, etiquetas, foto ============ */

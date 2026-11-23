@@ -380,7 +380,7 @@ function PostIt({
       </h3>
       {note.hasImage && <NoteImage note={note} />}
       {note.content && (
-        <p className="postit-content">
+        <p className={`postit-content ${note.content.length > 100 || note.content.split('\n').length > 5 ? 'long' : ''}`}>
           <Linked text={note.content} />
         </p>
       )}

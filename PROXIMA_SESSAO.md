@@ -1,7 +1,7 @@
 # Próxima sessão: onde paramos (otimização 60 fps)
 
 > Leia isto primeiro. Ele resume o estado da otimização e evita refazer investigação já feita.
-> Última atualização: 22/11/2026.
+> Última atualização: 22/11/2026 (3ª rodada).
 
 ## Meta
 
@@ -12,11 +12,21 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 ## Estado do git
 
 - Já no GitHub: tudo até `305d351` (segurança/Q1–Q5).
-- **Commits locais, ainda NÃO enviados:** `1dc10cf` (Q6–Q10, acessibilidade/calendário) e `3ece88d`
-  (otimização 1ª rodada) — e o commit desta sessão (otimização 2ª rodada + este arquivo + medidor).
+- **Commits locais, ainda NÃO enviados:** `1dc10cf` (Q6–Q10, acessibilidade/calendário), `3ece88d`
+  (otimização 1ª rodada), `534bc8b` (2ª rodada + este arquivo + medidor) e o da 3ª rodada.
 - Fora do git (não commitar): `graphify-out/` (graphify interrompido a pedido) e `Lixeira - Atalho.lnk`.
 
-## O que foi feito nesta sessão (2ª rodada)
+## 3ª rodada (22/11/2026, noite)
+
+| Mudança | Arquivo(s) | Ganho medido |
+|---|---|---|
+| Estado da janela do post-it fora da página (`createStore`/`useStore` em `lib/store.js`; `NoteModalHost` em `page.js`). Abrir/fechar redesenha só a janela | `lib/store.js`, `page.js` | Abrir janela no celular 6× lento: 16–28 → **52–58**; PC 4× com 200 post-its: 4–10 → **45–48** |
+| Trocas de `.offscreen`/`.many-notes` adiadas enquanto o mural se mexe (`pending` + `MutationObserver` na classe `is-moving`) | `page.js` | Zoom no PC 4×, 40 post-its: 21–28 → **33–51** (1 travada) |
+| Retângulo do mural lido 1× por gesto de zoom (`room.current.rect`) | `lib/useInfiniteBoard.js` | Menos layout forçado no meio do zoom |
+| Minimapa no modo leve atualiza só quando o movimento para (220 ms) | `BoardOverlays.js` | Menos trabalho durante zoom/rolagem em aparelho fraco |
+| graphify concluído: `graphify-out/` (fora do git) com `graph.html`, `GRAPH_REPORT.md`, `graph.json`. Achado: `BoardPage()` é o nó mais conectado (84 ligações, coesão 0,06) — dividir a página é o caminho para o desempenho | — | Consultar com `graphify query "..."` (Python 3.12 já tem o graphify) |
+
+## O que foi feito na 2ª rodada (22/11/2026)
 
 | Mudança | Arquivo(s) | Por quê / ganho medido |
 |---|---|---|
@@ -36,25 +46,23 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Números (build de produção, Chrome invisível, 200 post-its salvo indicação)
 
-| Cenário | Parado | Arrastar | Rolar | Zoom | Abrir janela |
+| Cenário (após a 3ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
 |---|---|---|---|---|---|
-| PC normal, completo | 60 | 57 | 50 | 43 | 41 |
-| PC 4× mais lento, leve, **40 post-its** | 61 | 37–44 | 52 | 21–28 | 43–48 |
-| PC 4× mais lento, leve, 200 post-its | 61 | 23 | 13 | 8 | 10 |
-| Celular 6× mais lento (≈ J2), leve, 40 post-its | 60 | — | 58–59 | — | 16–28 |
+| PC normal, completo | 57–60 | 49–57 | 52–58 | 29–47 | 55 |
+| PC 4× mais lento, leve, **40 post-its** | 61 | 42–56 | 45–56 | 33–51 | 49–50 |
+| PC 4× mais lento, leve, 200 post-its | 61 | 27–34 | 11–13 | 14–15 | 45–48 |
+| Celular 6× mais lento (≈ J2), leve, 40 post-its | 60 | — | 60 | — | 52–58 |
 
 Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4–6, zoom 4–5. Rodar o medidor com
 **jogos e Steam fechados** (Forza/Steam derrubavam e oscilavam os números).
 
 ## Próximos passos (em ordem de valor)
 
-1. **Abrir a janela do post-it no celular fraco (16–28 fps):** o custo é o React refazendo a página toda ao
-   abrir/fechar (≈ 80 ms num PC normal). Caminho: tirar o estado da janela (`modal`) da página — store
-   próprio como o `createLiveDrag` em `BoardOverlays.js` — ou memorizar os filhos pesados (WeatherWidget,
-   FolderSwitcher, BoardTools) com funções estáveis (`useStableHandlers` em `page.js`).
-2. **Zoom em aparelho fraco (21–28 com 40 post-its):** por quadro roda `apply()` (lê `getBoundingClientRect`,
-   escreve scroll) + IntersectionObserver + minimapa. Ideias: guardar o retângulo do mural no começo do gesto;
-   adiar as trocas de `.offscreen` enquanto `.is-moving`.
+1. ~~Abrir a janela no celular fraco~~ e ~~zoom com 40 post-its~~: feitos na 3ª rodada.
+2. **Estresse com 200 post-its em aparelho fraco** (zoom 14–15, rolar 11–13): o resto da página ainda é
+   refeito em outras ações. Próximo passo natural, seguindo o graphify: tirar mais estado do `BoardPage`
+   (pastas/painéis/busca) para stores próprios, como foi feito com a janela (`lib/store.js`), ou memorizar
+   WeatherWidget, FolderSwitcher e BoardTools com funções estáveis (`useStableHandlers`).
 3. Modo completo ainda tem ~71 camadas (post-its "respirando" com `translate`); só importa em aparelho bom.
 4. Next.js **16.4.3 → 16.4.6**: o próprio `next build` avisa de falha de segurança conhecida (às vezes para o
    build — rodar de novo passa). Atualizar com aprovação do Gustavo (`npm i next@16.4.6` no `frontend`).

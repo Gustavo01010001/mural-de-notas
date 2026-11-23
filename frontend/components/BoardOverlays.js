@@ -345,7 +345,9 @@ function MinimapBase({ notes, sizes, liveDrag, boardRef, board, boardTop, onClos
     let timer = 0;
     let last = 0;
     const off = board.subscribe(() => {
-      const wait = Math.max(0, 80 - (performance.now() - last));
+      // modo leve (aparelho fraco): só quando o movimento para — redesenhar o minimapa no meio do zoom pesava
+      const lite = document.documentElement.classList.contains('lite');
+      const wait = lite ? 220 : Math.max(0, 80 - (performance.now() - last));
       clearTimeout(timer);
       timer = setTimeout(() => {
         last = performance.now();

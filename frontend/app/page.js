@@ -32,6 +32,7 @@ import FocusTimer from '@/components/FocusTimer';
 import Icon from '@/components/Icon';
 import { resolveScene } from '@/lib/scenes';
 import { usePerformanceMode } from '@/lib/performance';
+import { createStore, useStore } from '@/lib/store';
 
 // O mural livre começa abaixo da barra do topo (senão os post-its de cima ficam escondidos atrás dela)
 const BOARD_TOP = 76;
@@ -115,6 +116,24 @@ function useIsMobile() {
 
 // Funções com identidade fixa que sempre chamam a versão mais nova (para o memo do PostIt funcionar:
 // arrastar, rolar ou dar zoom refaz só o post-it que mudou, não os 200 da tela)
+// Janela do post-it: lê o próprio estado (store). Abrir e fechar redesenha só ela, não a página inteira
+// (num celular simples, abrir a janela refazia post-its, clima, topo... e travava).
+function NoteModalHost({ store, notes, changedByName, ...props }) {
+  const modal = useStore(store);
+  const latest = modal.note ? (notes.find((n) => n.id === modal.note.id) ?? null) : null;
+  return (
+    <NoteModal
+      {...props}
+      open={modal.open}
+      note={modal.note}
+      latest={latest}
+      whoChanged={changedByName(latest)}
+      onRebase={(fresh) => store.set((m) => ({ ...m, note: fresh }))}
+      folderNotes={notes}
+    />
+  );
+}
+
 function useStableHandlers(handlers) {
   const latest = useRef(handlers);
   useLayoutEffect(() => {
@@ -152,7 +171,7 @@ export default function BoardPage() {
   const [notes, setNotes] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
-  const [modal, setModal] = useState({ open: false, note: null });
+  const [modalStore] = useState(() => createStore({ open: false, note: null })); // janela do post-it (ver NoteModalHost)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [autoCalm, setAutoCalm] = useState(false);
@@ -584,6 +603,7 @@ export default function BoardPage() {
       Notification.requestPermission().catch(() => {});
     }
     const targetFolder = form.folderId ?? null;
+    const modal = modalStore.get();
     try {
       if (modal.note) {
         // baseVersion: a versão que estava aberta; se alguém mudou no meio tempo, o back avisa (409)
@@ -978,9 +998,9 @@ export default function BoardPage() {
     router.replace('/login');
   }
 
-  const openNew = () => setModal({ open: true, note: null });
-  const openEdit = (note) => setModal({ open: true, note });
-  const closeModal = useCallback(() => setModal((m) => ({ ...m, open: false })), []);
+  const openNew = () => modalStore.set({ open: true, note: null });
+  const openEdit = (note) => modalStore.set({ open: true, note });
+  const closeModal = useCallback(() => modalStore.set((m) => ({ ...m, open: false })), [modalStore]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const closeSpecial = useCallback(() => setSpecialPanel(null), []);
   const closeCalendar = useCallback(() => setCalendarOpen(false), []);
@@ -1148,18 +1168,29 @@ export default function BoardPage() {
     const board = boardRef.current;
     if (!board || typeof IntersectionObserver === 'undefined') return;
     const visible = new Set();
+    // Com o mural em movimento (zoom, rolar, arrastar o fundo) as animações já estão pausadas: trocar classes
+    // a cada post-it que entra ou sai da tela só recalculava estilo no meio do gesto (e "many-notes", ao cruzar
+    // 40 visíveis, recalculava o mural inteiro). As trocas esperam o movimento parar.
+    const pending = new Map();
+    const flush = () => {
+      for (const [el, inView] of pending) el.classList.toggle('offscreen', !inView);
+      pending.clear();
+      for (const el of visible) if (!el.isConnected) visible.delete(el); // post-it que saiu da tela de vez
+      board.classList.toggle('many-notes', visible.size > MANY_VISIBLE);
+    };
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          e.target.classList.toggle('offscreen', !e.isIntersecting);
+          pending.set(e.target, e.isIntersecting);
           if (e.isIntersecting) visible.add(e.target);
           else visible.delete(e.target);
         }
-        for (const el of visible) if (!el.isConnected) visible.delete(el); // post-it que saiu da tela de vez
-        board.classList.toggle('many-notes', visible.size > MANY_VISIBLE);
+        if (!board.classList.contains('is-moving')) flush();
       },
       { root: board, rootMargin: '300px' },
     );
+    const stopped = new MutationObserver(() => pending.size && !board.classList.contains('is-moving') && flush());
+    stopped.observe(board, { attributes: true, attributeFilter: ['class'] });
     const watch = (root) => {
       if (root.nodeType !== 1) return;
       if (root.matches('.postit')) io.observe(root);
@@ -1172,6 +1203,7 @@ export default function BoardPage() {
     return () => {
       mo.disconnect();
       io.disconnect();
+      stopped.disconnect();
       board.classList.remove('many-notes');
     };
   }, []);
@@ -1643,14 +1675,11 @@ export default function BoardPage() {
         +
       </motion.button>
 
-      <NoteModal
-        open={modal.open}
-        note={modal.note}
-        latest={modal.note ? notes.find((n) => n.id === modal.note.id) ?? null : null}
-        whoChanged={changedByName(modal.note ? notes.find((n) => n.id === modal.note.id) : null)}
-        onRebase={(fresh) => setModal((m) => ({ ...m, note: fresh }))}
+      <NoteModalHost
+        store={modalStore}
+        notes={notes}
+        changedByName={changedByName}
         links={links}
-        folderNotes={notes}
         onLink={createLink}
         onUnlink={removeLink}
         onGoTo={(id) => {

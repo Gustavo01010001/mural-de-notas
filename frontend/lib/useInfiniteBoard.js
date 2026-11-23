@@ -77,7 +77,10 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       if (!board || !canvas || !layer) return;
       const prev = z.current;
       next = clampZoom(next);
-      const rect = board.getBoundingClientRect();
+      // retângulo do mural e tamanho atual lidos uma vez por gesto (ler a cada giro da roda forçava o
+      // navegador a recalcular o layout no meio do zoom)
+      room.current ??= { w: canvas.offsetWidth, h: canvas.offsetHeight, rect: board.getBoundingClientRect() };
+      const rect = room.current.rect;
       const px = ax - rect.left;
       const py = ay - rect.top;
       // ponto do mural que está debaixo do cursor
@@ -89,11 +92,10 @@ export function useInfiniteBoard({ boardRef, canvasRef, layerRef, enabled, zoom,
       // os post-its (mudar também o tamanho do mural a cada giro da roda custava metade dos quadros).
       // O mural só cresce quando falta espaço para rolar (com folga, raramente); o tamanho exato é
       // acertado no fim do gesto (fitRoom).
-      room.current ??= { w: canvas.offsetWidth, h: canvas.offsetHeight };
       const needW = w * next + board.clientWidth;
       const needH = h * next + boardTop + board.clientHeight;
       if (needW > room.current.w || needH > room.current.h) {
-        room.current = { w: Math.ceil(Math.max(needW, room.current.w) * 1.25), h: Math.ceil(Math.max(needH, room.current.h) * 1.25) };
+        room.current = { ...room.current, w: Math.ceil(Math.max(needW, room.current.w) * 1.25), h: Math.ceil(Math.max(needH, room.current.h) * 1.25) };
         canvas.style.width = `${room.current.w}px`;
         canvas.style.height = `${room.current.h}px`;
       }

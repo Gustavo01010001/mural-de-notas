@@ -9,6 +9,7 @@ import Icon from './Icon';
 
 // Elementos dentro do post-it que não devem começar um arrasto
 const INTERACTIVE = 'button, input, a, label, .resize-handle, .postit-menu, .link-handle';
+const ONE = () => 1;
 
 // Arrastar perto da borda da tela faz o mural rolar sozinho (sensação de espaço infinito)
 const EDGE = 56;
@@ -49,7 +50,7 @@ function PostIt({
   found = false,
   grid = false,
   index = 0,
-  zoom = 1,
+  getZoom = ONE, // zoom do mural lido na hora (arrastar/redimensionar): mudar o zoom não refaz os post-its
   selecting = false,
   selected = false,
   arranging = false,
@@ -105,8 +106,8 @@ function PostIt({
   // ----- arrastar -----
   // posição no mural = onde começou + quanto o mouse andou + quanto o mural rolou (com zoom, 1px na tela não é 1px no mural)
   const dragPos = (d) => ({
-    x: Math.max(0, d.ox + (d.cx - d.sx + d.board.scrollLeft - d.sl) / zoom),
-    y: Math.max(0, d.oy + (d.cy - d.sy + d.board.scrollTop - d.st) / zoom),
+    x: Math.max(0, d.ox + (d.cx - d.sx + d.board.scrollLeft - d.sl) / d.zoom),
+    y: Math.max(0, d.oy + (d.cy - d.sy + d.board.scrollTop - d.st) / d.zoom),
   });
 
   function handleDown(e) {
@@ -114,7 +115,7 @@ function PostIt({
     if (linkMode || selecting || e.shiftKey || e.ctrlKey || e.metaKey) return; // clique vira seleção / destino da seta
     e.currentTarget.setPointerCapture(e.pointerId);
     const board = e.currentTarget.closest('.board') ?? document.scrollingElement;
-    drag.current = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, ox: pos.x, oy: pos.y, moved: false, board, sl: board.scrollLeft, st: board.scrollTop };
+    drag.current = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, ox: pos.x, oy: pos.y, moved: false, board, sl: board.scrollLeft, st: board.scrollTop, zoom: getZoom() };
     setDragging(true);
     onFocus(note.id);
   }
@@ -194,14 +195,15 @@ function PostIt({
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     const box = e.currentTarget.parentElement.getBoundingClientRect();
-    resize.current = { sx: e.clientX, sy: e.clientY, w: box.width / zoom, h: box.height / zoom };
+    const zoom = getZoom();
+    resize.current = { sx: e.clientX, sy: e.clientY, w: box.width / zoom, h: box.height / zoom, zoom };
   }
   function resizeMove(e) {
     const r = resize.current;
     if (!r) return;
     setSize({
-      width: Math.min(520, Math.max(160, r.w + (e.clientX - r.sx) / zoom)),
-      height: Math.min(640, Math.max(140, r.h + (e.clientY - r.sy) / zoom)),
+      width: Math.min(520, Math.max(160, r.w + (e.clientX - r.sx) / r.zoom)),
+      height: Math.min(640, Math.max(140, r.h + (e.clientY - r.sy) / r.zoom)),
     });
   }
   function resizeUp() {

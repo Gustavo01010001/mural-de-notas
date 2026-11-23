@@ -1,7 +1,7 @@
 # Próxima sessão: onde paramos (otimização 60 fps)
 
 > Leia isto primeiro. Ele resume o estado da otimização e evita refazer investigação já feita.
-> Última atualização: 22/11/2026 (3ª rodada).
+> Última atualização: 22/11/2026 (4ª rodada).
 
 ## Meta
 
@@ -13,8 +13,16 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 - Já no GitHub: tudo até `305d351` (segurança/Q1–Q5).
 - **Commits locais, ainda NÃO enviados:** `1dc10cf` (Q6–Q10, acessibilidade/calendário), `3ece88d`
-  (otimização 1ª rodada), `534bc8b` (2ª rodada + este arquivo + medidor) e o da 3ª rodada.
-- Fora do git (não commitar): `graphify-out/` (graphify interrompido a pedido) e `Lixeira - Atalho.lnk`.
+  (otimização 1ª rodada), `534bc8b` (2ª rodada + este arquivo + medidor), `a18598e` (3ª rodada) e o da 4ª.
+- Fora do git (não commitar): `graphify-out/` (mapa do graphify) e `Lixeira - Atalho.lnk`.
+
+## 4ª rodada (22/11/2026, noite) — estresse com 200 post-its
+
+| Mudança | Arquivo(s) | Ganho medido |
+|---|---|---|
+| Regras de `.is-moving` sem seletor terminando em `*` (`.topbar > *`, `.weather-icon *` → classes explícitas) | `infinite.css` | Com `*` o Chrome recalculava a página inteira (6.187 elementos) no começo/fim de cada rolagem/zoom. Rolar com 200 post-its (PC 4×): 11–19 → **45–51** (trace: estilo 2.178 → 111 ms) |
+| Removido `pointer-events: none` nos post-its durante o movimento (propriedade herdada = recalcula todos os filhos) | `infinite.css` | Idem |
+| Post-it lê o zoom na hora (`getZoom`) em vez de receber `zoom` como propriedade | `PostIt.js`, `page.js` | Num aparelho lento o zoom "gravava" no meio do gesto e refazia os 201 post-its; zoom com 200 (PC 4×): 9–14 → **21–30** |
 
 ## 3ª rodada (22/11/2026, noite)
 
@@ -46,12 +54,12 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Números (build de produção, Chrome invisível, 200 post-its salvo indicação)
 
-| Cenário (após a 3ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
+| Cenário (após a 4ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
 |---|---|---|---|---|---|
-| PC normal, completo | 57–60 | 49–57 | 52–58 | 29–47 | 55 |
-| PC 4× mais lento, leve, **40 post-its** | 61 | 42–56 | 45–56 | 33–51 | 49–50 |
-| PC 4× mais lento, leve, 200 post-its | 61 | 27–34 | 11–13 | 14–15 | 45–48 |
-| Celular 6× mais lento (≈ J2), leve, 40 post-its | 60 | — | 60 | — | 52–58 |
+| PC normal, completo | 60 | 58 | 48–58 | 39–47 | 53–55 |
+| PC 4× mais lento, leve, **40 post-its** | 61 | **57–59** | **56–59** | **36–60** | **54–58** |
+| PC 4× mais lento, leve, 200 post-its | 61 | 32–35 | 22–51 | 21–30 | 53–57 |
+| Celular 6× mais lento (≈ J2), leve, 40 post-its | 61 | — | 60 | — | 52–58 |
 
 Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4–6, zoom 4–5. Rodar o medidor com
 **jogos e Steam fechados** (Forza/Steam derrubavam e oscilavam os números).
@@ -59,10 +67,12 @@ Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4�
 ## Próximos passos (em ordem de valor)
 
 1. ~~Abrir a janela no celular fraco~~ e ~~zoom com 40 post-its~~: feitos na 3ª rodada.
-2. **Estresse com 200 post-its em aparelho fraco** (zoom 14–15, rolar 11–13): o resto da página ainda é
-   refeito em outras ações. Próximo passo natural, seguindo o graphify: tirar mais estado do `BoardPage`
-   (pastas/painéis/busca) para stores próprios, como foi feito com a janela (`lib/store.js`), ou memorizar
-   WeatherWidget, FolderSwitcher e BoardTools com funções estáveis (`useStableHandlers`).
+2. **Estresse com 200 post-its em aparelho fraco** (zoom 21–30, rolar 22–51): o maior custo restante no trace é
+   **"Layerize"** (o Chrome percorre os pedaços de desenho dos 200 post-its a cada quadro, ~1,1–1,7 s a cada 3 s
+   no PC 4×). Ideias: menos pedaços por post-it (fita com `transform` própria, corte do texto com
+   `overflow: hidden`); NÃO voltar com `content-visibility` (explode camadas) nem `visibility: hidden` fora da
+   tela (tira o texto do leitor de tela). Também dá para tirar mais estado do `BoardPage` (graphify: 84
+   ligações) para stores como `lib/store.js`.
 3. Modo completo ainda tem ~71 camadas (post-its "respirando" com `translate`); só importa em aparelho bom.
 4. Next.js **16.4.3 → 16.4.6**: o próprio `next build` avisa de falha de segurança conhecida (às vezes para o
    build — rodar de novo passa). Atualizar com aprovação do Gustavo (`npm i next@16.4.6` no `frontend`).

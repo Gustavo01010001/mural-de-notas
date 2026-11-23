@@ -42,6 +42,7 @@ const MANY_VISIBLE = 40;
 const QUIET_ENTRY = 40;
 // Abaixo deste zoom o texto dos post-its fica ilegível: o mural mostra só cor e título (bem mais leve)
 const FAR_ZOOM = 0.5;
+const ONE = () => 1; // zoom fixo da grade do celular
 const MINIMAP_KEY = 'mural_minimap';
 const SUBJECTS_KEY = 'mural_subjects';
 
@@ -1323,7 +1324,7 @@ export default function BoardPage() {
             note={note}
             grid={gridMode}
             index={i}
-            zoom={z}
+            getZoom={gridMode ? ONE : boardApi.getZoom}
             calm={calm}
             found={foundId === note.id}
             selecting={selecting}
@@ -1352,7 +1353,7 @@ export default function BoardPage() {
         ))}
       </AnimatePresence>
     ),
-    [shownNotes, gridMode, z, calm, foundId, selection, arranging, linkMode, linkCount, quietEntry, noteFns, handleDragMove],
+    [shownNotes, gridMode, boardApi, calm, foundId, selection, arranging, linkMode, linkCount, quietEntry, noteFns, handleDragMove],
   );
 
   return (

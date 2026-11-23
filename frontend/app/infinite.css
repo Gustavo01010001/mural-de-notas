@@ -584,23 +584,24 @@ html.theme-light .minimap-canvas rect:not(.minimap-view) {
   will-change: transform;
 }
 
-/* durante o movimento ninguém consegue passar o mouse com calma: sem efeitos de hover caros
-   (menos no post-it que está sendo arrastado até a borda — ele precisa continuar recebendo o mouse) */
-.board.is-moving .postit:not(.is-dragging) {
-  pointer-events: none;
-}
+/* (Removido) pointer-events: none nos post-its durante o movimento: a propriedade é herdada, então começar e
+   parar cada rolagem/zoom recalculava ~6 mil elementos (0,4 s num PC fraco); o hover que ela evitava custa
+   bem menos. */
 
+/* Regras de ".is-moving" sempre com classes explícitas, nunca terminando em "*": com "*" o Chrome não sabe
+   quais elementos a troca da classe afeta e recalculava o estilo da página inteira (~6 mil elementos) no
+   começo e no fim de cada rolagem ou zoom. */
 /* vidro fosco (backdrop-filter) é recalculado a cada quadro quando o mural passa por baixo:
    durante o movimento vira um fundo sólido quase igual; quando o mural para, o vidro volta */
-.board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .weather, .upcoming, .zoom-control, .tool-btn, .focus-timer, .minimap, .brand) {
+.board.is-moving :is(.folder-trigger, .gear-btn, .presence-bar, .weather, .upcoming, .zoom-control, .tool-btn, .focus-timer, .minimap, .brand) {
   backdrop-filter: none !important;
 }
 
-.board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+.board.is-moving :is(.folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
   background-color: rgba(24, 24, 32, 0.94) !important;
 }
 
-html.theme-light .board.is-moving :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+html.theme-light .board.is-moving :is(.folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
   background-color: rgba(255, 255, 255, 0.96) !important;
 }
 
@@ -679,11 +680,11 @@ html.lite *::after {
 }
 
 /* sem o desfoque, o "vidro" quase transparente vira um fundo sólido quase igual */
-html.lite :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+html.lite :is(.folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
   background-color: rgba(24, 24, 32, 0.94) !important;
 }
 
-html.lite.theme-light :is(.topbar > *, .folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
+html.lite.theme-light :is(.folder-trigger, .gear-btn, .presence-bar, .upcoming, .zoom-control, .tool-btn, .minimap, .brand) {
   background-color: rgba(255, 255, 255, 0.96) !important;
 }
 
@@ -795,7 +796,7 @@ html.lite .postit.is-today {
   }
 }
 
-.board.is-moving :is(.weather-icon, .weather-icon *, .clock-sep),
+.board.is-moving :is(.weather-icon, .wx-sun-core, .wx-sun-rays, .wx-star, .wx-cloud, .drop, .flake, .wx-bolt, .clock-sep),
 .board.is-moving .weather::before {
   animation-play-state: paused !important;
 }

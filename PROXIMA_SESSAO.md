@@ -1,7 +1,7 @@
 # Próxima sessão: onde paramos (otimização 60 fps)
 
 > Leia isto primeiro. Ele resume o estado da otimização e evita refazer investigação já feita.
-> Última atualização: 22/11/2026 (6ª rodada).
+> Última atualização: 23/11/2026 (7ª rodada).
 
 ## Meta
 
@@ -11,9 +11,17 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Estado do git
 
-- Enviado ao GitHub até a 5ª rodada (`83b8f03`). A 6ª rodada pode estar só em commit local: conferir
+- Enviado ao GitHub até a 6ª rodada (`628811d`). A 7ª rodada pode estar só em commit local: conferir
   `git status -sb` (enviar só com aprovação do Gustavo).
 - Fora do git (não commitar): `graphify-out/` (mapa do graphify) e `Lixeira - Atalho.lnk`.
+
+## 7ª rodada (23/11/2026) — aparelho bem fraco
+
+| Mudança | Arquivo(s) | Ganho medido |
+|---|---|---|
+| Observador de "fora da tela" (`IntersectionObserver`) desligado no modo leve — ele só servia para pausar o "respirar", que o leve já desliga | `page.js` | Com 200 post-its ele recalculava a posição de todos a cada quadro (559 ms no trace do celular 6×). PC 4× com 200: arrastar 18–24 → **52**, janela 34–36 → **54**, zoom 39–44 → **51** |
+| Bolinhas de cor e botão de salvar da janela como botões comuns (crescer/apertar em CSS: `.press-pop`, `.press`) em vez de componentes animados da biblioteca | `NoteModal.js`, `infinite.css` | Abrir a janela no celular 10× mais lento: 31–36 → **42–51** |
+| Investigado: o documento é redesenhado ~23× no gesto de zoom **mesmo escondendo tudo menos os post-its** — é interno do mural/Chrome, não de um componente de fora | — | — |
 
 ## 6ª rodada (22/11/2026, noite) — zoom só na placa de vídeo
 
@@ -70,12 +78,13 @@ sozinho (memória ≤ 4 GB, economia de dados, ou tela parada abaixo de 40 fps) 
 
 ## Números (build de produção, Chrome invisível, 200 post-its salvo indicação)
 
-| Cenário (após a 6ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
+| Cenário (após a 7ª rodada) | Parado | Arrastar | Rolar | Zoom | Abrir janela |
 |---|---|---|---|---|---|
-| PC normal, completo | 60 | 52–59 | 50 | 38 | 53–56 |
-| PC 4× mais lento, leve, **40 post-its** | 61 | 29–56 | **58–60** | **48–53** | 44–58 |
-| PC 4× mais lento, leve, 200 post-its (em grade de 8 colunas*) | 61 | 18–24 | 44 | **39–44** | 34–36 |
-| Celular 6× mais lento (≈ J2), leve, 40 post-its | 61 | — | 60 | — | 35–58 |
+| PC normal, completo | 60 | 58 | 53 | 56 | 56 |
+| PC 4× mais lento, leve, **40 post-its** | 61 | **56–59** | **58–59** | **52–57** | **54–59** |
+| PC 4× mais lento, leve, 200 post-its (em grade de 8 colunas*) | 61 | **52** | **56** | **51** | **54** |
+| Celular 6× mais lento, leve, 200 post-its | 60 | — | **58** | — | **55** |
+| Celular 10× mais lento (≈ J2 ou pior), leve, 40 post-its | 58–60 | — | 46–54 | — | 42–51 |
 
 \* A conta de teste foi arrumada em grade de 8 colunas (cenário `arrumar` do medidor), que deixa mais post-its
 visíveis ao mesmo tempo do que a disposição das rodadas anteriores — arrastar/janela com 200 não são
@@ -89,12 +98,12 @@ Antes desta rodada (PC 4× leve, 200): parado 13–19, arrastar 6–8, rolar 4�
 ## Próximos passos (em ordem de valor)
 
 1. ~~Abrir a janela no celular fraco~~ e ~~zoom com 40 post-its~~: feitos na 3ª rodada.
-2. **200 post-its em aparelho fraco**: zoom 39–44, rolar 44, arrastar 18–24 (grade densa). No gesto de zoom
-   ainda há Layerize (~0,5–0,7 s a cada 2,5 s no PC 4×) e o documento é redesenhado em ~metade dos quadros —
-   descobrir o que ainda invalida (cenário `t_zoom_puro` com `INVAL=1` lista o que é pintado). O post-it ainda
-   tem transformação própria (inclinação via framer-motion) — testar a inclinação no próprio desenho.
-   NÃO voltar com `content-visibility` (explode camadas), `visibility: hidden` fora da tela (tira o texto do
-   leitor de tela) nem `overflow: clip` no `.canvas` (piora o zoom).
+2. **Meta praticamente atingida** até o PC 4× e o celular 6× (inclusive com 200 post-its). O que sobra é o
+   celular **10×** mais lento: rolagem 46–54 e janela 42–51 — o custo restante ao abrir a janela é montar o
+   `NoteModal` (ainda ~14 componentes animados; dá para trocar mais por CSS) e coleta de lixo (MajorGC). No
+   zoom com 200 ainda há Layerize (~0,5–0,7 s/2,5 s no PC 4×). NÃO voltar com `content-visibility` (explode
+   camadas), `visibility: hidden` fora da tela (tira o texto do leitor de tela) nem `overflow: clip` no
+   `.canvas` (piora o zoom).
 2b. O **back reinicia sozinho** de vez em quando (5× nesta sessão; provável OneDrive mexendo nos arquivos com o
    `node --watch`). Nos testes aparece como "Internal Server Error"/500 — repetir o teste.
 3. Modo completo ainda tem ~71 camadas (post-its "respirando" com `translate`); só importa em aparelho bom.

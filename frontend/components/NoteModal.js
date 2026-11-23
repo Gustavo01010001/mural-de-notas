@@ -417,15 +417,15 @@ export default function NoteModal({
               </div>
             )}
 
+            {/* botões comuns (o crescer/apertar é CSS): componentes animados da biblioteca pesavam para montar a
+                janela num celular simples */}
             <div className="color-row" role="radiogroup" aria-label="Cor">
               {COLORS.map((c) => (
-                <motion.button
+                <button
                   key={c.id}
                   type="button"
-                  className={`color-dot dot-${c.id} ${form.color === c.id ? 'selected' : ''}`}
+                  className={`color-dot press-pop dot-${c.id} ${form.color === c.id ? 'selected' : ''}`}
                   onClick={() => setForm((f) => ({ ...f, color: c.id }))}
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
                   aria-label={c.label}
                   aria-checked={form.color === c.id}
                   role="radio"
@@ -587,9 +587,9 @@ export default function NoteModal({
               <button type="button" className="btn-ghost" onClick={onClose}>
                 Cancelar
               </button>
-              <motion.button type="submit" className="btn-dark" disabled={saving} whileTap={{ scale: 0.95 }}>
+              <button type="submit" className="btn-dark press" disabled={saving}>
                 {saving ? 'Salvando...' : note ? 'Salvar' : 'Colar no mural'}
-              </motion.button>
+              </button>
             </div>
           </motion.form>
         </motion.div>

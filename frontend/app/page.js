@@ -1166,9 +1166,11 @@ export default function BoardPage() {
   // Desempenho com muitos post-its: só "respira" quem está na tela. Um único observador marca os de fora
   // com .offscreen; se mais de MANY_VISIBLE estiverem visíveis, o mural ganha .many-notes (sem animação).
   // Tudo direto nas classes, sem redesenhar os post-its.
+  // No modo leve o "respirar" já é desligado: o observador seria só trabalho (com 200 post-its, recalcular a
+  // posição de todos a cada quadro custava mais de meio segundo a cada poucos segundos num celular simples).
   useEffect(() => {
     const board = boardRef.current;
-    if (!board || typeof IntersectionObserver === 'undefined') return;
+    if (!board || typeof IntersectionObserver === 'undefined' || perf.lite) return;
     const visible = new Set();
     // Com o mural em movimento (zoom, rolar, arrastar o fundo) as animações já estão pausadas: trocar classes
     // a cada post-it que entra ou sai da tela só recalculava estilo no meio do gesto (e "many-notes", ao cruzar
@@ -1208,7 +1210,7 @@ export default function BoardPage() {
       stopped.disconnect();
       board.classList.remove('many-notes');
     };
-  }, []);
+  }, [perf.lite]);
 
   // começar uma seta: arrastando a bolinha do post-it (e) ou pelo menu ⋯ (sem e: depois clica no destino)
   const startLink = (note, e) => {

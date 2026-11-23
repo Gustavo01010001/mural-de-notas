@@ -816,3 +816,28 @@ html.lite .weather::before {
 .postit.is-dragging {
   will-change: transform, translate;
 }
+
+/* efeito de crescer/apertar feito em CSS (no lugar de componentes animados da biblioteca, caros de montar) */
+.press-pop,
+.press {
+  transition: transform 0.15s ease-out;
+}
+
+.press-pop:hover {
+  transform: scale(1.2);
+}
+
+.press-pop:active {
+  transform: scale(0.9);
+}
+
+.press:active {
+  transform: scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press-pop,
+  .press {
+    transition: none;
+  }
+}

@@ -95,6 +95,7 @@ return document.querySelectorAll('.postit').length;`;
 const SCEN = {
   parado: `return await __fps(null);`,
   perfil: `return 'x';`,
+  cor: `document.querySelector('[aria-label="Novo post-it"]').click(); await __w(700); const d=[...document.querySelectorAll('.note-modal .color-dot')]; const alvo=d[2]; alvo.click(); await __w(200); const r={bolinhas:d.length, selecionada:alvo.classList.contains('selected'), aria:alvo.getAttribute('aria-checked'), cor_da_janela:document.querySelector('.note-modal').className.match(/postit-(\w+)/)?.[1]}; window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); await __w(600); return r;`,
   prep: `await __reset(); await __w(900); return 'ok';`,
   ancora: `await __reset(); const a=[...document.querySelectorAll('.postit')].find(p=>{const r=p.getBoundingClientRect(); return r.top>120&&r.left>120&&r.right<innerWidth-300&&r.bottom<innerHeight-80&&document.elementFromPoint(r.left+10,r.top+10)?.closest('.postit')===p;}); if(!a) return 'sem post-it livre'; const c=()=>{const r=a.querySelector('.postit-title').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)];}; const p0=c(); const r0=a.getBoundingClientRect(); const ax=r0.left+10, ay=r0.top+10; const pt=()=>{const r=a.getBoundingClientRect(); return [Math.round(r.left-ax), Math.round(r.top-ay)];}; const ini=pt(); for(let i=0;i<12;i++){ __b.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-8,clientX:ax,clientY:ay})); await __f(); } const meio=pt(); const escalaMeio=document.querySelector('.canvas-zoom').style.transform; await __w(700); const depois=pt(); const escalaDepois=document.querySelector('.canvas-zoom').style.transform; const rol=[__b.scrollLeft,__b.scrollTop].map(Math.round); await __reset(); return {canto_do_postit_rel_cursor:{inicio:ini, meio_do_gesto:meio, depois_de_gravar:depois}, escalaMeio, escalaDepois, rolagem_depois:rol};`,
   zoom_puro: `return await __fps(i=>__b.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:Math.sin(i/12)*10,clientX:innerWidth/2,clientY:innerHeight/2})));`,
@@ -116,6 +117,8 @@ const SCEN = {
     on=false; return Math.round(n*1000/(performance.now()-t0))+'/'+lg;`,
 };
 const VARIANTS = {
+  sem_ferramentas: '.board-tools,.zoom-control,.fab{display:none!important}',
+  so_canvas: '.weather,.minimap,.board-tools,.zoom-control,.fab,.topbar,.stars,.links-layer,.pins-layer,.upcoming{display:none!important}',
   canvas_clip: '.canvas.free{overflow:clip!important}',
   fios_escalam: '.links-layer path{vector-effect:none!important}',
   sem_fios_tachinhas: '.links-layer,.pins-layer,.link-toolbar-layer{display:none!important}',
